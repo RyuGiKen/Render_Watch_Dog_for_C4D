@@ -23,7 +23,7 @@ echo  端口: %PORT%   检测间隔: %INTERVAL%s   进程: %PROC_NAME%
 echo ================================================
 echo.
 
-:: 路径检查（一跑就告诉你哪错了，不会静默没反应）
+:: 路径检查
 if not exist "%EXE%" (
     color 0C
     echo [✘] 找不到文件:
@@ -34,8 +34,13 @@ if not exist "%EXE%" (
     echo   C:\Program Files\Maxon Cinema 4D 2026\
     echo   C:\Program Files\Maxon\Cinema 4D\2026\
     echo.
-    pause & exit /b 1
+    pause
+    exit /b 1
 )
+
+:: 清理可能残留的"初始检查进程"文件
+if exist "初始检查进程" del "初始检查进程" >nul 2>&1
+if exist ">>" del ">>" >nul 2>&1
 
 :: 日志轮转
 call :rotate_log
@@ -67,7 +72,7 @@ set total_rst=0
 
 :loop
 set "now=%date% %time%"
-call :log --- 检测回合: !now!
+call :log "--- 检测回合: !now!"
 
 :: 1) 进程在不在
 call :proc_alive
@@ -77,9 +82,12 @@ if "!alive!"=="0" (
     goto maybe_restart
 )
 
-:: 2) 端口有没有 LISTENING（netstat 不依赖任何外部工具）
+:: 2) 端口有没有 LISTENING/侦听（适配中文版 Windows）
 set "port_ok=0"
-for /f "tokens=1,*" %%a in ('netstat -ano 2^>nul ^| findstr /i /r ":%PORT%.*LISTENING"') do set port_ok=1
+for /f "delims=" %%L in ('netstat -ano 2^>nul ^| findstr ":%PORT%"') do (
+    echo %%L | findstr /c:"LISTENING" /c:"侦听" >nul
+    if !errorlevel! equ 0 set port_ok=1
+)
 
 if "!port_ok!"=="0" (
     set /a fail_cnt+=1
@@ -87,9 +95,9 @@ if "!port_ok!"=="0" (
     goto maybe_restart
 )
 
-:: 3) 端口通不通（用 powershell 一行，Windows 自带，不需要 .ps1 文件）
+:: 3) 端口通不通
 set "conn_ok=0"
-powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference='Stop'; $c=New-Object Net.Sockets.TcpClient; try{$r=$c.BeginConnect('127.0.0.1',%PORT%,$null,$null); if($r.AsyncWaitHandle.WaitOne(2000){$c.EndConnect($r);$c.Close();exit 0}else{exit 1}}catch{exit 1}" >nul 2>&1
+powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference='SilentlyContinue'; $c=New-Object Net.Sockets.TcpClient; $r=$c.BeginConnect('127.0.0.1',%PORT%,$null,$null); if($r.AsyncWaitHandle.WaitOne(2000)){$c.EndConnect($r);$c.Close();exit 0}else{exit 1}" >nul 2>&1
 if !errorlevel! equ 0 set conn_ok=1
 
 if "!conn_ok!"=="0" (
@@ -104,7 +112,7 @@ if !fail_cnt! equ 0 call :log "[✓] 正常  PID=!cur_pid!  端口=%PORT%"
 set fail_cnt=0
 
 :summary
-call :log "--- 累计重启:%total_rst%  下次检测约 %INTERVAL% 秒后 ------------------"
+call :log "--- 累计重启:!total_rst!  下次检测约 %INTERVAL% 秒后 ------------------"
 echo.
 timeout /t %INTERVAL% /nobreak >nul
 goto loop
@@ -112,7 +120,7 @@ goto loop
 :maybe_restart
 if !fail_cnt! lss %FAIL_LIMIT% goto summary
 call :log "[✘] 达到 %FAIL_LIMIT% 次 → 重启"
-call :log "taskkill /f /im \"%PROC_NAME%\" ..."
+call :log "taskkill /f /im "%PROC_NAME%" ..."
 taskkill /f /im "%PROC_NAME%" >nul 2>&1
 timeout /t 3 /nobreak >nul
 call :launch
@@ -140,24 +148,23 @@ start "" "%EXE%"
 exit /b
 
 :log
-echo %date% %time:~0,8%  %~1 >> "%LOG%"
-echo %~1
+set "msg=%~1"
+if not defined msg exit /b
+set "time_now=%time: =0%"
+set "date_now=%date%"
+:: 避免创建错误文件
+echo %date_now% %time_now:~0,8%  %msg% >> "%LOG%"
+echo %msg%
 exit /b
 
 :rotate_log
-if exist "%LOG%" (
-    call :fsize "%LOG%" LOGSZ
-    if !LOGSZ! gtr %MAX_LOG_BYTES% (
-        set "BF=%LOG%.%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%.bak"
-        set "BF=!BF: =0!"
-        move "%LOG%" "!BF!" >nul 2>&1
-        echo [日志] 已轮转，旧日志: !BF!
-    )
+if not exist "%LOG%" exit /b
+for %%F in ("%LOG%") do set "LOGSZ=%%~zF"
+if not defined LOGSZ set "LOGSZ=0"
+if !LOGSZ! gtr %MAX_LOG_BYTES% (
+    set "bak_file=%LOG%.%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%.bak"
+    set "bak_file=!bak_file: =0!"
+    move "%LOG%" "!bak_file!" >nul 2>&1
+    echo [日志] 已轮转，旧日志: !bak_file!
 )
-exit /b
-
-:: 取文件字节大小（兼容没有 ~z 的情况）
-:fsize
-set "%~2=0"
-for /f "usebackq" %%S in ('"%~1"') do set "%~2=%%~zS"
 exit /b
