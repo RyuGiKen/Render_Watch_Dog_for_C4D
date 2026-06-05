@@ -1,222 +1,138 @@
 @echo off
 chcp 65001 >nul
-setlocal EnableDelayedExpansion
+setlocal enabledelayedexpansion
 
-:: ========== CONFIG ==========
-set "EXE_PATH=C:\Program Files\Maxon Cinema 4D 2026\Cinema 4D Team Render Client.exe"
+:: ========== 配置 ==========
+set "EXE=C:\Program Files\Maxon Cinema 4D 2026\Cinema 4D Team Render Client.exe"
 set "PORT=5401"
-set "PROC_NAME=Cinema 4D Team Render Client.exe"
-:: ============================
+set "LOG=c4d_monitor.log"
+:: =========================
 
-set "CHECK_INTERVAL=300"
-set "STARTUP_DELAY=60"
-set "MAX_FAILURES=3"
-set "LOG_FILE=c4d_monitor.log"
-set "MAX_LOG_SIZE=10485760"
-
-:: ---------- INIT ----------
-title C4D Client Monitor
+title C4D Client PID 监控
 cls
 echo ========================================
-echo   C4D Team Render Client Monitor
-echo   Port: %PORT%  Check: %CHECK_INTERVAL%s
+echo   C4D Team Render Client 监控 (PID方式)
+echo   端口: %PORT%  检查间隔: 5分钟
 echo ========================================
 echo.
 
-:: Check if executable exists
-if not exist "%EXE_PATH%" (
-    echo [ERROR] File not found: %EXE_PATH%
+:: 检查文件是否存在
+if not exist "%EXE%" (
+    echo [错误] 找不到文件:
+    echo   %EXE%
     echo.
-    echo Please edit line 7 in this bat file and set the correct path.
-    echo.
+    echo 请确认路径是否正确
     pause
-    exit /b 1
+    exit /b
 )
 
-:: Clean up any stray files
-if exist "check" del "check" 2>nul
-if exist "start" del "start" 2>nul
+:: 初始化日志
+echo [%date% %time:~0,8%] 监控启动 > "%LOG%"
 
-:: Initialize log
-echo. > "%LOG_FILE%"
-
-:: Log function
-:LOG
-set "MESSAGE=%~1"
-if "%MESSAGE%"=="" goto :EOF
-set "TIMESTAMP=%date% %time:~0,8%"
-echo %TIMESTAMP%  %MESSAGE% >> "%LOG_FILE%"
-echo %MESSAGE%
-goto :EOF
-
-:: Check if process is running
-:CHECK_PROCESS
-set "PROCESS_ALIVE=0"
-set "PROCESS_PID="
-for /f "tokens=2" %%p in ('tasklist /fi "imagename eq %PROC_NAME%" /nh 2^>nul') do (
-    set "PROCESS_ALIVE=1"
-    set "PROCESS_PID=%%p"
+:: 获取当前PID
+:GET_PID
+set "CURRENT_PID="
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING"') do (
+    set "CURRENT_PID=%%p"
 )
-goto :EOF
-
-:: Start the process
-:START_PROCESS
-start "" "%EXE_PATH%"
-timeout /t 3 /nobreak >nul
-call :CHECK_PROCESS
-if "%PROCESS_ALIVE%"=="1" (
-    echo Started (PID=!PROCESS_PID!)
-    set "START_RESULT=1"
-) else (
-    echo Failed to start
-    set "START_RESULT=0"
-)
-goto :EOF
-
-:: Check if port is listening
-:CHECK_PORT
-set "PORT_OK=0"
-for /f "tokens=1,2,3,4" %%a in ('netstat -ano 2^>nul') do (
-    if "%%d"=="LISTENING" (
-        echo %%a | findstr ":%PORT%" >nul
-        if !errorlevel! equ 0 set PORT_OK=1
-    )
-)
-goto :EOF
-
-:: Check if port is connectable
-:CHECK_CONNECTION
-set "CONN_OK=0"
-powershell -Command "$c=New-Object Net.Sockets.TcpClient; $r=$c.BeginConnect('127.0.0.1',%PORT%,$null,$null); if($r.AsyncWaitHandle.WaitOne(2000)){$c.EndConnect($r);$c.Close();exit 0}else{exit 1}" 2>nul
-if !errorlevel! equ 0 set CONN_OK=1
-goto :EOF
-
-:: ---------- MAIN PROGRAM ----------
-call :LOG "=== C4D Client Monitor Started ==="
-call :LOG "Path: %EXE_PATH%"
-call :LOG "Port: %PORT%  Interval: %CHECK_INTERVAL%s"
-
-:: Initial check
-call :LOG "Checking initial state..."
-call :CHECK_PROCESS
-if "%PROCESS_ALIVE%"=="0" (
-    call :LOG "Process not running, attempting to start..."
+if not defined CURRENT_PID (
+    echo [%time:~0,8%] 端口 %PORT% 未监听，启动程序...
+    echo [%date% %time:~0,8%] 端口未监听，启动程序 >> "%LOG%"
     
-    :: Try to start up to 3 times
-    set "ATTEMPTS=0"
-    set "SUCCESS=0"
-    
-    :START_ATTEMPT
-    set /a ATTEMPTS+=1
-    call :LOG "Start attempt !ATTEMPTS!/3..."
-    call :START_PROCESS
-    
-    if "%START_RESULT%"=="1" (
-        set SUCCESS=1
-        call :LOG "Start successful!"
+    :: 修复启动命令 - 使用正确的语法
+    if exist "%EXE%" (
+        cd /d "%~dp0"
+        start "" "%EXE%"
     ) else (
-        if !ATTEMPTS! lss 3 (
-            call :LOG "Failed, retrying in 5 seconds..."
-            timeout /t 5 /nobreak >nul
-            goto START_ATTEMPT
-        ) else (
-            call :LOG "Failed 3 times, exiting..."
-        )
+        echo [错误] 程序文件不存在: %EXE%
+        pause
+        exit /b
     )
-) else (
-    call :LOG "Process already running (PID=!PROCESS_PID!)"
-    set SUCCESS=1
+    
+    timeout /t 60 /nobreak >nul
+    goto GET_PID
 )
 
-if "%SUCCESS%"=="0" (
-    call :LOG "Cannot start process, monitor will exit"
-    pause
-    exit /b 1
-)
+echo [%time:~0,8%] 找到进程 PID: !CURRENT_PID!
+echo [%date% %time:~0,8%] 初始PID: !CURRENT_PID! >> "%LOG%"
 
-:: Wait for startup
-call :LOG "Waiting %STARTUP_DELAY% seconds for initialization..."
-timeout /t %STARTUP_DELAY% /nobreak >nul
-
-:: Main monitoring loop
-set FAILURE_COUNT=0
-set RESTART_COUNT=0
-set "LAST_CHECK="
-
-:MONITOR_LOOP
-set "CHECK_TIME=%time%"
-if "%CHECK_TIME%" neq "%LAST_CHECK%" (
-    call :LOG "--- Check at %CHECK_TIME% ---"
-    set "LAST_CHECK=%CHECK_TIME%"
-)
-
-:: Check 1: Process
-call :CHECK_PROCESS
-if "%PROCESS_ALIVE%"=="0" (
-    set /a FAILURE_COUNT+=1
-    call :LOG "[WARN] Process gone (!FAILURE_COUNT!/%MAX_FAILURES%)"
-    goto CHECK_RESTART
-)
-
-:: Check 2: Port
-call :CHECK_PORT
-if "%PORT_OK%"=="0" (
-    set /a FAILURE_COUNT+=1
-    call :LOG "[WARN] Port not listening (!FAILURE_COUNT!/%MAX_FAILURES%)"
-    goto CHECK_RESTART
-)
-
-:: Check 3: Connection
-call :CHECK_CONNECTION
-if "%CONN_OK%"=="0" (
-    set /a FAILURE_COUNT+=1
-    call :LOG "[WARN] Port not responding (!FAILURE_COUNT!/%MAX_FAILURES%)"
-    goto CHECK_RESTART
-)
-
-:: All good
-if %FAILURE_COUNT% gtr 0 call :LOG "[OK] Status recovered"
-if %FAILURE_COUNT% equ 0 call :LOG "[OK] Running (PID=!PROCESS_PID!)"
-set FAILURE_COUNT=0
-
-:END_CHECK
-call :LOG "Status: OK  Restarts: !RESTART_COUNT!"
-call :LOG "Waiting %CHECK_INTERVAL% seconds..."
+:: 主监控循环
+:MAIN_LOOP
 echo.
-timeout /t %CHECK_INTERVAL% /nobreak >nul
-goto MONITOR_LOOP
+echo ========================================
+echo 检查时间: %date% %time:~0,8%
+echo 目标PID: !CURRENT_PID!
+echo.
 
-:CHECK_RESTART
-if %FAILURE_COUNT% lss %MAX_FAILURES% goto END_CHECK
+:: 检查1: 端口是否还在监听
+set "PORT_OK=0"
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING"') do (
+    if "%%p"=="!CURRENT_PID!" set PORT_OK=1
+)
 
-call :LOG "[ERROR] Max failures reached, restarting..."
-
-:: Kill process
-call :LOG "Killing process..."
-taskkill /f /im "%PROC_NAME%" >nul 2>&1
-timeout /t 3 /nobreak >nul
-
-:: Start process
-set "START_OK=0"
-for /l %%i in (1,1,3) do (
-    if "%START_OK%"=="0" (
-        call :LOG "Start attempt %%i/3..."
-        call :START_PROCESS
-        if "%START_RESULT%"=="1" set START_OK=1
-        if "%START_OK%"=="0" timeout /t 5 /nobreak >nul
+if "!PORT_OK!"=="0" (
+    echo [警告] 端口 %PORT% 不再监听
+    echo [%date% %time:~0,8%] 端口不再监听，重启程序 >> "%LOG%"
+    
+    :: 尝试结束原进程
+    taskkill /f /pid !CURRENT_PID! >nul 2>&1
+    timeout /t 3 /nobreak >nul
+    
+    :: 启动新进程
+    if exist "%EXE%" (
+        cd /d "%~dp0"
+        start "" "%EXE%"
+    )
+    echo [信息] 已重启程序，等待2分钟...
+    timeout /t 120 /nobreak >nul
+    
+    :: 获取新PID
+    set "CURRENT_PID="
+    for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING"') do (
+        set "CURRENT_PID=%%p"
+    )
+    
+    if defined CURRENT_PID (
+        echo [成功] 新PID: !CURRENT_PID!
+        echo [%date% %time:~0,8%] 重启成功，新PID: !CURRENT_PID! >> "%LOG%"
+    ) else (
+        echo [错误] 无法获取新PID
+        echo [%date% %time:~0,8%] 重启失败 >> "%LOG%"
+    )
+) else (
+    :: 检查2: 进程是否还在运行
+    tasklist /fi "PID eq !CURRENT_PID!" | findstr "!CURRENT_PID!" >nul
+    if errorlevel 1 (
+        echo [警告] PID !CURRENT_PID! 进程不存在
+        echo [%date% %time:~0,8%] PID !CURRENT_PID! 进程不存在 >> "%LOG%"
+        
+        :: 启动新进程
+        if exist "%EXE%" (
+            cd /d "%~dp0"
+            start "" "%EXE%"
+        )
+        echo [信息] 已启动程序，等待2分钟...
+        timeout /t 120 /nobreak >nul
+        
+        :: 获取新PID
+        set "CURRENT_PID="
+        for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING"') do (
+            set "CURRENT_PID=%%p"
+        )
+        
+        if defined CURRENT_PID (
+            echo [成功] 新PID: !CURRENT_PID!
+            echo [%date% %time:~0,8%] 新进程PID: !CURRENT_PID! >> "%LOG%"
+        )
+    ) else (
+        echo [正常] 进程运行中 (PID: !CURRENT_PID!)
+        echo [%date% %time:~0,8%] 状态正常 >> "%LOG%"
     )
 )
 
-if "%START_OK%"=="1" (
-    set /a RESTART_COUNT+=1
-    set FAILURE_COUNT=0
-    call :LOG "[SUCCESS] Restart complete (Total: !RESTART_COUNT!)"
-    call :LOG "Waiting %STARTUP_DELAY% seconds..."
-    timeout /t %STARTUP_DELAY% /nobreak >nul
-) else (
-    call :LOG "[CRITICAL] Cannot start process, stopping monitor"
-    pause
-    exit /b 1
-)
-
-goto MONITOR_LOOP
+:: 等待5分钟
+echo.
+echo [信息] 等待5分钟后再次检查...
+echo ========================================
+timeout /t 300 /nobreak >nul
+goto MAIN_LOOP
