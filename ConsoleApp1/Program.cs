@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -18,7 +19,7 @@ namespace ConsoleApp1
         private const int CheckIntervalSeconds = 30; // 检查间隔（秒）
         private const int MaxHangCount = 4; // 最大挂起次数
         const int mPort = 5401;
-
+        const string ReportPath = "C:\\Users\\12407024\\AppData\\Roaming\\Maxon\\Maxon Cinema 4D 2026_1ABCDC12_c\\_bugreports\\_BugReport.txt";
         // 用于跟踪进程挂起次数
         private static Dictionary<int, int> processHangCount = new Dictionary<int, int>();
 
@@ -65,8 +66,7 @@ namespace ConsoleApp1
                 // 进程不存在，清除相关记录
                 //CleanUpOldRecords();
                 processHangCount = new Dictionary<int, int>();
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 目标进程不存在，跳过处理");
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 端口[{mPort}]：" + (portUsing ? "占用" : "断开"));
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 目标进程不存在，端口[{mPort}]：" + (portUsing ? "占用" : "断开"));
                 return;
             }
 
@@ -75,12 +75,20 @@ namespace ConsoleApp1
                 // 检查进程是否响应
                 bool isResponding = CheckProcessResponding(targetProcess);
                 //bool portUsing = CheckAndPrint(mPort);
-                if (!isResponding || !portUsing)
+                bool newBugReport = CheckFileRecentlyModified(ReportPath, new TimeSpan(0, 0, CheckIntervalSeconds));
+
+                if (!isResponding || !portUsing || newBugReport)
                 {
                     // 进程无响应
                     int hangCount = GetAndIncrementHangCount(targetProcess.Id);
 
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] " + (portUsing ? $"进程无响应! PID: {targetProcess.Id}" : $"端口[{mPort}]断开!") + $", 挂起次数: {hangCount}/{MaxHangCount}");
+                    string str = $"进程无响应! PID: {targetProcess.Id}";
+                    if (newBugReport)
+                        str = $"进程异常! PID: {targetProcess.Id}";
+                    else if (!portUsing)
+                        str = $"端口[{mPort}]断开!";
+
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {str}, 挂起次数: {hangCount}/{MaxHangCount}");
 
                     if (hangCount >= MaxHangCount)
                     {
@@ -99,7 +107,7 @@ namespace ConsoleApp1
                     }
                     else
                     {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程[{targetProcess.Id}]正常运行");
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程[{targetProcess.Id}]正常运行，端口[{mPort}]：" + (portUsing ? "占用" : "断开"));
                     }
                 }
             }
@@ -173,16 +181,16 @@ namespace ConsoleApp1
                 // 等待进程完全退出
                 if (process.WaitForExit(5000))
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ 进程已成功终止. PID: {process.Id}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] V 进程已成功终止. PID: {process.Id}");
                 }
                 else
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ 进程终止超时，但已发送终止信号. PID: {process.Id}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ！ 进程终止超时，但已发送终止信号. PID: {process.Id}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ 终止进程失败: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] X 终止进程失败: {ex.Message}");
             }
         }
 
@@ -247,13 +255,33 @@ namespace ConsoleApp1
             bool result = IsPortUsed(port, protocol);
             if (result)
             {
-                Console.WriteLine($"端口 {port}/{protocol} 已被占用");
+                //Console.WriteLine($"端口 {port}/{protocol} 已被占用");
             }
             else
             {
-                Console.WriteLine($"端口 {port}/{protocol} 可用");
+                //Console.WriteLine($"端口 {port}/{protocol} 可用");
             }
             return result;
+        }
+        static bool CheckFileRecentlyModified(string filePath, TimeSpan activeInterval)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                // 关键：用 *Write* 时间，别用 LastAccessTime（Windows 会缓存/禁用）
+                var lastWrite = File.GetLastWriteTimeUtc(filePath);
+
+                // 防御：未来时间戳（时钟回拨/时区问题/拷贝文件导致）直接视为不活跃更稳
+                var now = DateTime.UtcNow;
+                if (lastWrite > now)
+                    return false;
+
+                return (now - lastWrite).TotalSeconds < activeInterval.TotalSeconds * (MaxHangCount + 2);
+            }
+            catch { }
+            return false;
         }
     }
 }
