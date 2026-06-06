@@ -26,7 +26,9 @@ namespace ConsoleApp1
         static void Main(string[] args)
         {
             Console.WriteLine($"开始监控进程: {ProcessName}");
+            Console.WriteLine($"端口号: {mPort}");
             Console.WriteLine($"目标路径: {TargetPath}");
+            Console.WriteLine($"异常路径: {ReportPath}");
             Console.WriteLine($"检查间隔: {CheckIntervalSeconds}秒");
             Console.WriteLine($"连续挂起{MaxHangCount}次后将终止进程");
             Console.WriteLine("按 Ctrl+C 退出监控");
@@ -82,13 +84,8 @@ namespace ConsoleApp1
                     // 进程无响应
                     int hangCount = GetAndIncrementHangCount(targetProcess.Id);
 
-                    string str = $"进程无响应! PID: {targetProcess.Id}";
-                    if (newBugReport)
-                        str = $"进程异常! PID: {targetProcess.Id}";
-                    else if (!portUsing)
-                        str = $"端口[{mPort}]断开!";
-
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {str}, 挂起次数: {hangCount}/{MaxHangCount}");
+                    string str = " 进程" + (newBugReport ? "异常! " : "无响应! ") + $" PID: {targetProcess.Id} 端口[{mPort}]：" + (portUsing ? "占用" : "断开");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]{str}, 挂起次数: {hangCount}/{MaxHangCount}");
 
                     if (hangCount >= MaxHangCount)
                     {
@@ -192,8 +189,10 @@ namespace ConsoleApp1
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] X 终止进程失败: {ex.Message}");
             }
+            Thread.Sleep(CheckIntervalSeconds * 1000);
+            //Process.Start(TargetPath);
+            Thread.Sleep(CheckIntervalSeconds * 1000);
         }
-
         private static void CleanUpOldRecords()
         {
             // 清理不存在的进程记录
