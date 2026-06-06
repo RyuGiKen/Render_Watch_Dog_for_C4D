@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +17,7 @@ namespace ConsoleApp1
         private const string ProcessName = "Cinema 4D Team Render Client";
         private const int CheckIntervalSeconds = 30; // 检查间隔（秒）
         private const int MaxHangCount = 4; // 最大挂起次数
+        const int mPort = 5401;
 
         // 用于跟踪进程挂起次数
         private static Dictionary<int, int> processHangCount = new Dictionary<int, int>();
@@ -56,13 +59,14 @@ namespace ConsoleApp1
         {
             // 查找目标进程
             Process targetProcess = FindTargetProcess();
-
+            bool portUsing = CheckAndPrint(mPort);
             if (targetProcess == null)
             {
                 // 进程不存在，清除相关记录
                 //CleanUpOldRecords();
                 processHangCount = new Dictionary<int, int>();
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 目标进程不存在，跳过处理");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 端口[{mPort}]：" + (portUsing ? "占用" : "断开"));
                 return;
             }
 
@@ -70,13 +74,13 @@ namespace ConsoleApp1
             {
                 // 检查进程是否响应
                 bool isResponding = CheckProcessResponding(targetProcess);
-
-                if (!isResponding)
+                //bool portUsing = CheckAndPrint(mPort);
+                if (!isResponding || !portUsing)
                 {
                     // 进程无响应
                     int hangCount = GetAndIncrementHangCount(targetProcess.Id);
 
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程无响应! PID: {targetProcess.Id}, 挂起次数: {hangCount}/{MaxHangCount}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] " + (portUsing ? $"进程无响应! PID: {targetProcess.Id}" : $"端口[{mPort}]断开!") + $", 挂起次数: {hangCount}/{MaxHangCount}");
 
                     if (hangCount >= MaxHangCount)
                     {
@@ -204,6 +208,52 @@ namespace ConsoleApp1
             {
                 processHangCount.Remove(pid);
             }
+        }
+        /// <summary>
+        /// 检查端口是否被使用
+        /// </summary>
+        public static bool IsPortUsed(int port, string protocol = "TCP")
+        {
+            try
+            {
+                if (protocol.ToUpper() == "TCP")
+                {
+                    var listener = new TcpListener(IPAddress.Loopback, port);
+                    listener.Start();
+                    listener.Stop();
+                    return false;
+                }
+                else
+                {
+                    var client = new UdpClient(port);
+                    return false;
+                }
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+            {
+                return true;
+            }
+            catch
+            {
+                return true; // 其他异常也视为端口被占用
+            }
+        }
+
+        /// <summary>
+        /// 检查端口并打印结果
+        /// </summary>
+        public static bool CheckAndPrint(int port, string protocol = "TCP")
+        {
+            bool result = IsPortUsed(port, protocol);
+            if (result)
+            {
+                Console.WriteLine($"端口 {port}/{protocol} 已被占用");
+            }
+            else
+            {
+                Console.WriteLine($"端口 {port}/{protocol} 可用");
+            }
+            return result;
         }
     }
 }
