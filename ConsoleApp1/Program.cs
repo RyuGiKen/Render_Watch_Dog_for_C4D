@@ -13,15 +13,46 @@ namespace ConsoleApp1
 {
     internal class Program
     {
-        // 配置参数
+        /// <summary>
+        /// 进程路径
+        /// </summary>
         private const string TargetPath = @"C:\Program Files\Maxon Cinema 4D 2026\Cinema 4D Team Render Client.exe";
+        /// <summary>
+        /// 进程名称
+        /// </summary>
         private const string ProcessName = "Cinema 4D Team Render Client";
-        private const int CheckIntervalSeconds = 30; // 检查间隔（秒）
-        private const int MaxHangCount = 4; // 最大挂起次数
+        /// <summary>
+        /// 检查间隔（秒）
+        /// </summary>
+        private const int CheckIntervalSeconds = 60;
+        /// <summary>
+        /// 最大挂起次数
+        /// </summary>
+        private const int MaxHangCount = 4;
+        /// <summary>
+        /// 端口号
+        /// </summary>
         const int mPort = 5401;
+        /// <summary>
+        /// 异常记录路径
+        /// </summary>
         const string ReportPath = "C:\\Users\\12407024\\AppData\\Roaming\\Maxon\\Maxon Cinema 4D 2026_1ABCDC12_c\\_bugreports\\_BugReport.txt";
-        // 用于跟踪进程挂起次数
+        /// <summary>
+        /// 跟踪进程挂起次数
+        /// </summary>
         private static Dictionary<int, int> processHangCount = new Dictionary<int, int>();
+        /// <summary>
+        /// 上次启动时间
+        /// </summary>
+        static DateTime LastStartTime = DateTime.Now;
+        /// <summary>
+        /// 连续工作限制（分钟）
+        /// </summary>
+        const int WorkingTime = 60;
+        /// <summary>
+        /// 休息时间（分钟）
+        /// </summary>
+        const int RestTime = 3;
 
         static void Main(string[] args)
         {
@@ -31,9 +62,10 @@ namespace ConsoleApp1
             Console.WriteLine($"异常路径: {ReportPath}");
             Console.WriteLine($"检查间隔: {CheckIntervalSeconds}秒");
             Console.WriteLine($"连续挂起{MaxHangCount}次后将终止进程");
+            Console.WriteLine($"连续运行{WorkingTime}分钟后将休息{RestTime}分钟");
             Console.WriteLine("按 Ctrl+C 退出监控");
             Console.WriteLine("----------------------------------------");
-
+            LastStartTime = DateTime.Now;
             try
             {
                 // 主监控循环
@@ -41,7 +73,23 @@ namespace ConsoleApp1
                 {
                     try
                     {
-                        CheckAndMonitorProcess();
+                        Process targetProcess = FindTargetProcess();
+
+                        TimeSpan workedtime = DateTime.Now - LastStartTime;
+                        if (targetProcess != null && workedtime.TotalMinutes > WorkingTime)//长时间工作过热，中间休息降温
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 连续工作{workedtime:hh\\:mm\\:ss\\:fff}，休息降温");
+                            KillProcess(targetProcess, false);
+                            Thread.Sleep(RestTime * 60 * 1000);
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 休息结束");
+                        }
+
+                        if (targetProcess == null)
+                        {
+                            targetProcess = StartProcess();
+                            Thread.Sleep(CheckIntervalSeconds * 1000);
+                        }
+                        CheckAndMonitorProcess(targetProcess);
                     }
                     catch (Exception ex)
                     {
@@ -57,18 +105,19 @@ namespace ConsoleApp1
                 Console.WriteLine($"监控程序异常终止: {ex.Message}");
             }
         }
-
-        private static void CheckAndMonitorProcess()
+        /// <summary>
+        /// 监测进程是否正常
+        /// </summary>
+        /// <param name="targetProcess"></param>
+        private static void CheckAndMonitorProcess(Process targetProcess)
         {
-            // 查找目标进程
-            Process targetProcess = FindTargetProcess();
             bool portUsing = CheckAndPrint(mPort);
             if (targetProcess == null)
             {
                 // 进程不存在，清除相关记录
                 //CleanUpOldRecords();
                 processHangCount = new Dictionary<int, int>();
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 目标进程不存在，端口[{mPort}]：" + (portUsing ? "占用" : "断开"));
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 目标进程不存在，端口[{mPort}]：{(portUsing ? "占用" : "断开")}");
                 return;
             }
 
@@ -84,13 +133,13 @@ namespace ConsoleApp1
                     // 进程无响应
                     int hangCount = GetAndIncrementHangCount(targetProcess.Id);
 
-                    string str = " 进程" + (newBugReport ? "异常! " : "无响应! ") + $" PID: {targetProcess.Id} 端口[{mPort}]：" + (portUsing ? "占用" : "断开");
+                    string str = $" 进程{(newBugReport ? "异常! " : "无响应! ")} PID: {targetProcess.Id} 端口[{mPort}]：{(portUsing ? "占用" : "断开")}";
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]{str}, 挂起次数: {hangCount}/{MaxHangCount}");
 
                     if (hangCount >= MaxHangCount)
                     {
-                        // 连续三次无响应，终止进程
-                        KillProcess(targetProcess);
+                        // 连续无响应，终止进程
+                        KillProcess(targetProcess, true);
                         processHangCount.Remove(targetProcess.Id);
                     }
                 }
@@ -100,11 +149,12 @@ namespace ConsoleApp1
                     if (processHangCount.ContainsKey(targetProcess.Id))
                     {
                         processHangCount.Remove(targetProcess.Id);
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程恢复正常，重置挂起计数. PID: {targetProcess.Id}");
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程恢复正常，重置挂起计数. PID: {targetProcess.Id} 端口[{mPort}]：{(portUsing ? "占用" : "断开")}");
                     }
                     else
                     {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程[{targetProcess.Id}]正常运行，端口[{mPort}]：" + (portUsing ? "占用" : "断开"));
+                        TimeSpan workedtime = DateTime.Now - LastStartTime;
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 进程[{targetProcess.Id}]正常运行，端口[{mPort}]：{(portUsing ? "占用" : "断开")}  已正常工作{workedtime:hh\\:mm\\:ss\\:fff}");
                     }
                 }
             }
@@ -113,19 +163,18 @@ namespace ConsoleApp1
                 targetProcess.Dispose();
             }
         }
-
+        /// <summary>
+        /// 查找进程
+        /// </summary>
+        /// <returns></returns>
         private static Process FindTargetProcess()
         {
-            // 方法1: 按名称查找
             Process[] processes = Process.GetProcessesByName(ProcessName);
-
             foreach (Process process in processes)
             {
                 try
                 {
-                    // 方法2: 验证路径匹配
-                    //if (process.MainModule != null &&
-                    //    string.Equals(process.MainModule.FileName, TargetPath, StringComparison.OrdinalIgnoreCase))
+                    //if (process.MainModule != null && string.Equals(process.MainModule.FileName, TargetPath, StringComparison.OrdinalIgnoreCase))//验证路径匹配
                     {
                         return process;
                     }
@@ -141,7 +190,11 @@ namespace ConsoleApp1
 
             return null;
         }
-
+        /// <summary>
+        /// 响应状态
+        /// </summary>
+        /// <param name="process"></param>
+        /// <returns></returns>
         private static bool CheckProcessResponding(Process process)
         {
             try
@@ -156,7 +209,11 @@ namespace ConsoleApp1
                 return false;
             }
         }
-
+        /// <summary>
+        /// 计数
+        /// </summary>
+        /// <param name="processId"></param>
+        /// <returns></returns>
         private static int GetAndIncrementHangCount(int processId)
         {
             if (!processHangCount.ContainsKey(processId))
@@ -166,55 +223,59 @@ namespace ConsoleApp1
 
             return ++processHangCount[processId];
         }
-
-        private static void KillProcess(Process process)
+        /// <summary>
+        /// 结束进程
+        /// </summary>
+        /// <param name="process"></param>
+        /// <param name="restart"></param>
+        private static void KillProcess(Process process, bool restart)
         {
-            try
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 正在终止进程... PID: {process.Id}, 名称: {process.ProcessName}");
-
-                process.Kill();
-
-                // 等待进程完全退出
-                if (process.WaitForExit(5000))
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] V 进程已成功终止. PID: {process.Id}");
-                }
-                else
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ！ 进程终止超时，但已发送终止信号. PID: {process.Id}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] X 终止进程失败: {ex.Message}");
-            }
-            Thread.Sleep(CheckIntervalSeconds * 1000);
-            //Process.Start(TargetPath);
-            Thread.Sleep(CheckIntervalSeconds * 1000);
-        }
-        private static void CleanUpOldRecords()
-        {
-            // 清理不存在的进程记录
-            List<int> processesToRemove = new List<int>();
-
-            foreach (var kvp in processHangCount)
+            if (process != null)
             {
                 try
                 {
-                    Process.GetProcessById(kvp.Key);
-                }
-                catch (ArgumentException)
-                {
-                    // 进程不存在
-                    processesToRemove.Add(kvp.Key);
-                }
-            }
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 正在终止进程... PID: {process.Id}, 名称: {process.ProcessName}");
 
-            foreach (int pid in processesToRemove)
-            {
-                processHangCount.Remove(pid);
+                    process.Kill();
+
+                    // 等待进程完全退出
+                    if (process.WaitForExit(5000))
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] V 进程已成功终止. PID: {process.Id}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ！ 进程终止超时，但已发送终止信号. PID: {process.Id}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] X 终止进程失败: {ex.Message}");
+                }
+                Thread.Sleep(CheckIntervalSeconds * 2 * 1000);
             }
+            if (restart)
+                StartProcess();
+        }
+        /// <summary>
+        /// 启动进程
+        /// </summary>
+        /// <returns></returns>
+        static Process StartProcess()
+        {
+            Process process = null;
+            try
+            {
+                process = Process.Start(TargetPath);
+                LastStartTime = DateTime.Now;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] V 启动进程成功. PID: {process.Id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] X 启动进程失败: {ex.Message}");
+            }
+            Thread.Sleep(CheckIntervalSeconds * 1000);
+            return process;
         }
         /// <summary>
         /// 检查端口是否被使用
@@ -262,6 +323,12 @@ namespace ConsoleApp1
             }
             return result;
         }
+        /// <summary>
+        /// 异常文件近期有更新
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="activeInterval"></param>
+        /// <returns></returns>
         static bool CheckFileRecentlyModified(string filePath, TimeSpan activeInterval)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
@@ -277,7 +344,7 @@ namespace ConsoleApp1
                 if (lastWrite > now)
                     return false;
 
-                return (now - lastWrite).TotalSeconds < activeInterval.TotalSeconds * (MaxHangCount + 2);
+                return (now - lastWrite).TotalSeconds < activeInterval.TotalSeconds * (MaxHangCount + 1.5f);
             }
             catch { }
             return false;
