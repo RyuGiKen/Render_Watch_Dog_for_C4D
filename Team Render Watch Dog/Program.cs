@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ConsoleApp1
+namespace TeamRenderWatchDog
 {
     internal class Program
     {
@@ -36,7 +36,7 @@ namespace ConsoleApp1
         /// <summary>
         /// 异常记录路径
         /// </summary>
-        const string ReportPath = "C:\\Users\\12407024\\AppData\\Roaming\\Maxon\\Maxon Cinema 4D 2026_1ABCDC12_c\\_bugreports\\_BugReport.txt";
+        const string ReportPath = @"C:\Users\12407024\AppData\Roaming\Maxon\Maxon Cinema 4D 2026_1ABCDC12_c\_bugreports\_BugReport.txt";
         /// <summary>
         /// 跟踪进程挂起次数
         /// </summary>
