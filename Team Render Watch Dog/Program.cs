@@ -38,6 +38,10 @@ namespace TeamRenderWatchDog
         /// </summary>
         const string ReportPath = @"C:\Users\12407024\AppData\Roaming\Maxon\Maxon Cinema 4D 2026_1ABCDC12_c\_bugreports\_BugReport.txt";
         /// <summary>
+        /// 缓存目录
+        /// </summary>
+        const string CachePath = @"C:\Users\12407024\AppData\Roaming\Maxon\Maxon Cinema 4D 2026_1ABCDC12_c\teamrender_client\users\client";
+        /// <summary>
         /// 跟踪进程挂起次数
         /// </summary>
         private static Dictionary<int, int> processHangCount = new Dictionary<int, int>();
@@ -258,12 +262,53 @@ namespace TeamRenderWatchDog
                 StartProcess();
         }
         /// <summary>
+        /// 清空缓存目录下的所有文件与子目录（保留目录本身）
+        /// </summary>
+        private static void ClearCache()
+        {
+            try
+            {
+                // 删除所有文件
+                foreach (string file in Directory.GetFiles(CachePath))
+                {
+                    try
+                    {
+                        File.Delete(file);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 删除文件失败: {file} - {ex.Message}");
+                    }
+                }
+
+                // 删除所有子目录（递归）
+                foreach (string dir in Directory.GetDirectories(CachePath))
+                {
+                    try
+                    {
+                        Directory.Delete(dir, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 删除目录失败: {dir} - {ex.Message}");
+                    }
+                }
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 清空缓存完成");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 清空缓存异常: {ex.Message}");
+            }
+        }
+        /// <summary>
         /// 启动进程
         /// </summary>
         /// <returns></returns>
         static Process StartProcess()
         {
             Process process = null;
+            ClearCache();
             try
             {
                 process = Process.Start(TargetPath);
