@@ -103,7 +103,7 @@ namespace RenderServerGui.Models
                 FrameTimeoutSeconds = 600,
                 FrameCheckIntervalSeconds = 10,
                 MaxRetryPerFrame = 3,
-                OnFail = OnFailBehaviour.Stop
+                OnFail = OnFailBehaviour.Skip
             };
 
             switch (mode)

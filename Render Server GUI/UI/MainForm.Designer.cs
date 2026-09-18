@@ -61,6 +61,7 @@ namespace RenderServerGui.UI
             this.lblFrScene = new System.Windows.Forms.Label();
             this.txtFrScene = new System.Windows.Forms.TextBox();
             this.btnFrScene = new System.Windows.Forms.Button();
+            this.btnFrPreview = new System.Windows.Forms.Button();
             this.lblFrProc = new System.Windows.Forms.Label();
             this.txtFrProc = new System.Windows.Forms.TextBox();
             this.lblFrReport = new System.Windows.Forms.Label();
@@ -247,6 +248,7 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.lblFrScene);
             this.grpFrame.Controls.Add(this.txtFrScene);
             this.grpFrame.Controls.Add(this.btnFrScene);
+            this.grpFrame.Controls.Add(this.btnFrPreview);
             this.grpFrame.Controls.Add(this.lblFrProc);
             this.grpFrame.Controls.Add(this.txtFrProc);
             this.grpFrame.Controls.Add(this.lblFrReport);
@@ -317,6 +319,9 @@ namespace RenderServerGui.UI
             this.cmbFrOnFail.FormattingEnabled = true;
             this.cmbFrOnFail.Items.AddRange(new object[] { "停止并告警", "跳过继续" });
             this.cmbFrOnFail.Location = new System.Drawing.Point(150, 348); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(150, 25);
+
+            this.btnFrPreview.Location = new System.Drawing.Point(150, 380); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(300, 26);
+            this.btnFrPreview.Text = "预览输出文件名并校验目录"; this.btnFrPreview.UseVisualStyleBackColor = true;
 
             // panelLog
             this.panelLog.Controls.Add(this.lblLogTitle);
@@ -426,6 +431,7 @@ namespace RenderServerGui.UI
         private System.Windows.Forms.Label lblFrScene;
         private System.Windows.Forms.TextBox txtFrScene;
         private System.Windows.Forms.Button btnFrScene;
+        private System.Windows.Forms.Button btnFrPreview;
         private System.Windows.Forms.Label lblFrProc;
         private System.Windows.Forms.TextBox txtFrProc;
         private System.Windows.Forms.Label lblFrReport;

@@ -177,14 +177,18 @@ namespace RenderServerGui.Services
         {
             if (process != null)
             {
+                int pid = 0;
+                try { pid = process.Id; } catch { }
                 try
                 {
-                    LogInfo($"正在终止进程… PID: {process.Id}");
-                    process.Kill();
+                    LogInfo($"正在终止进程树… PID: {pid}");
+                    if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
+                    try { if (!process.HasExited) { process.Kill(); } } catch { }
                     if (process.WaitForExit(5000))
-                        LogInfo($"进程已成功终止. PID: {process.Id}");
+                        LogInfo($"进程已成功终止. PID: {pid}");
                     else
-                        LogWarn($"进程终止超时，但已发送终止信号. PID: {process.Id}");
+                        LogWarn($"进程终止超时，但已发送终止信号. PID: {pid}");
+                    if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
                 }
                 catch (Exception ex)
                 {
@@ -195,6 +199,27 @@ namespace RenderServerGui.Services
             }
             if (restart)
                 StartProcess();
+        }
+
+        private void RunTaskKill(string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("taskkill")
+                {
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (var pr = Process.Start(psi))
+                {
+                    pr?.WaitForExit(8000);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogWarn($"taskkill 执行失败({arguments}): {ex.Message}");
+            }
         }
 
         private Process StartProcess()

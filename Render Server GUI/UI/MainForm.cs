@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using RenderServerGui.Models;
 using RenderServerGui.Services;
@@ -66,6 +69,7 @@ namespace RenderServerGui.UI
             btnTrCache.Click += (s, e) => BrowseFolder(txtTrCache);
             btnFrScene.Click += (s, e) => BrowseScene(txtFrScene);
             btnFrOutput.Click += (s, e) => BrowseOutputFolder();
+            btnFrPreview.Click += (s, e) => OnPreviewOutput();
 
             FormClosing += OnFormClosingHandler;
         }
@@ -327,6 +331,89 @@ namespace RenderServerGui.UI
             if (info.Total <= 0) return;
             progressBar.Maximum = info.Total;
             progressBar.Value = Math.Min(info.Completed, info.Total);
+        }
+
+        // ---------- 输出名预览/校验 ----------
+
+        private void OnPreviewOutput()
+        {
+            if (!IsFrameMode(_cfg.Mode))
+            {
+                MessageBox.Show(this, "工程文件与输出模板用于单帧模式，请先切到 Cinema 4D 或 Commandline 模式。",
+                    "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            CommitCurrentProfile();
+            ModeProfile p = _cfg.ProfileOf(_cfg.Mode);
+
+            if (string.IsNullOrWhiteSpace(p.OutputTemplate))
+            {
+                MessageBox.Show(this, "输出模板为空。", "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (!Regex_HasToken(p.OutputTemplate))
+            {
+                MessageBox.Show(this, "输出模板缺少帧号占位符，应形如 Image_[xxxx].png（x 的个数=补零位数）。",
+                    "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string startPath = FrameScanner.FramePath(p.OutputTemplate, p.StartFrame);
+            string endPath = FrameScanner.FramePath(p.OutputTemplate, p.EndFrame);
+            var sb = new StringBuilder();
+            sb.AppendLine($"起始帧 {p.StartFrame} → {startPath}");
+            sb.AppendLine($"结束帧 {p.EndFrame} → {endPath}");
+            sb.AppendLine();
+
+            string dir = Path.GetDirectoryName(startPath);
+            bool dirOk = !string.IsNullOrEmpty(dir) && Directory.Exists(dir);
+            if (!dirOk)
+            {
+                sb.AppendLine("输出目录尚不存在：");
+                sb.AppendLine("  " + dir);
+                sb.AppendLine("（开始渲染时会自动创建，属正常情况）");
+            }
+            else
+            {
+                bool sOk = FrameScanner.IsFrameRendered(p.OutputTemplate, p.StartFrame);
+                bool eOk = FrameScanner.IsFrameRendered(p.OutputTemplate, p.EndFrame);
+                sb.AppendLine("起始帧成品已生成：" + (sOk ? "是" : "否"));
+                sb.AppendLine("结束帧成品已生成：" + (eOk ? "是" : "否"));
+
+                var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ".png", ".jpg", ".jpeg", ".exr", ".tif", ".tiff", ".bmp", ".psd", ".hdr", ".tga" };
+                List<string> samples = new List<string>();
+                try
+                {
+                    samples = Directory.EnumerateFiles(dir)
+                        .Where(f => exts.Contains(Path.GetExtension(f)))
+                        .Take(3)
+                        .Select(Path.GetFileName)
+                        .ToList();
+                }
+                catch { }
+
+                if (samples.Count > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("目录内图片文件示例（用于核对命名）：");
+                    foreach (var s in samples) sb.AppendLine("  " + s);
+
+                    if (!sOk && !eOk)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("⚠ 目录里有图片，但没有匹配模板的成品：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照示例修正模板。");
+                    }
+                }
+                else
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("（输出目录内暂无图片文件——全新任务属正常）");
+                }
+            }
+
+            MessageBox.Show(this, sb.ToString(), "输出文件预览 / 校验", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // ---------- 浏览对话框 ----------

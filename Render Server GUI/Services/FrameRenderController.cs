@@ -8,13 +8,17 @@ namespace RenderServerGui.Services
 {
     /// <summary>
     /// 单帧逐帧调度控制器，供 Cinema 4D 与 Commandline 两种模式共用（差异只在 ModeProfile 里的 exe 路径与异常记录路径）。
-    /// 流程：展开帧模板判已完成→跳过；否则启动 exe -render 帧号→轮询(退出码/产物文件/单帧超时/_BugReport 基线变化/有窗口时 Responding)
-    /// →异常杀进程重启本帧→达重试上限按策略停止或跳过→成功后帧间冷却→下一帧。
-    /// 注：无窗口进程（Commandline.exe）的 Responding 恒为 false，故仅在进程确有主窗口时才用 Responding 判活。
+    /// 流程：展开帧模板判"文件存在且非空"→跳过；否则启动 exe -render "工程" -frame 帧号→轮询
+    ///   · 进程退出：产物非空即成功，否则异常（含 _BugReport 基线变化=崩溃）
+    ///   · 进程仍在但超过单帧超时：若产物已生成→判"渲完未退出"→杀进程树算成功；否则判挂起→杀进程树重试
+    /// 异常后用 taskkill 杀整棵进程树，重试；达最大重试按策略跳过/停止；成功后帧间冷却→下一帧。
+    /// 注：无窗口进程（Commandline.exe）Responding 恒 false，仅在进程确有主窗口时才用 Responding 判活。
     /// </summary>
     public class FrameRenderController : IRenderController
     {
         private enum FrameResult { Success, Abnormal, Aborted }
+
+        private const int KillSettleSeconds = 15;   // 杀进程后等待，令 GPU 驱动/文件句柄充分释放
 
         private Thread _worker;
         private volatile bool _stopRequested;
@@ -37,7 +41,7 @@ namespace RenderServerGui.Services
 
             LogInfo($"逐帧渲染启动：{_p.ExePath} -render \"{_p.SceneFile}\" -frame [帧]");
             LogInfo($"帧范围 {_p.StartFrame}–{_p.EndFrame}，输出模板 {_p.OutputTemplate}");
-            LogInfo($"帧间冷却 {_p.CooldownSeconds}s，单帧超时 {_p.FrameTimeoutSeconds}s，检查间隔 {_p.FrameCheckIntervalSeconds}s，最大重试 {_p.MaxRetryPerFrame}");
+            LogInfo($"帧间冷却 {_p.CooldownSeconds}s，单帧超时 {_p.FrameTimeoutSeconds}s，检查间隔 {_p.FrameCheckIntervalSeconds}s，最大重试 {_p.MaxRetryPerFrame}，失败{(_p.OnFail == OnFailBehaviour.Skip ? "跳过" : "停止")}");
 
             _worker = new Thread(WorkerLoop) { IsBackground = true, Name = "FrameRenderController" };
             _worker.Start();
@@ -48,7 +52,7 @@ namespace RenderServerGui.Services
             if (!IsRunning) return;
             _stopRequested = true;
             RaiseStatus(RunnerStatus.Stopping);
-            LogInfo("正在停止…（将结束当前渲染进程）");
+            LogInfo("正在停止…（将结束当前渲染进程树）");
         }
 
         private void WorkerLoop()
@@ -70,16 +74,16 @@ namespace RenderServerGui.Services
                 {
                     if (_stopRequested) break;
 
-                    if (FrameScanner.IsFrameComplete(_p.OutputTemplate, frame))
+                    if (FrameScanner.IsFrameRendered(_p.OutputTemplate, frame))
                     {
                         completed++;
                         RaiseProgress(completed, total, frame, "已存在，跳过");
-                        LogInfo($"帧 {frame} 输出已存在，跳过。");
+                        LogInfo($"帧 {frame} 输出已存在且非空，跳过。");
                         continue;
                     }
 
-                    bool done = false;   // 本帧成功产出
-                    bool skipped = false; // 本帧被放弃但继续
+                    bool done = false;
+                    bool skipped = false;
                     int attempt = 0;
 
                     while (true)
@@ -99,7 +103,7 @@ namespace RenderServerGui.Services
                             }
                             else
                             {
-                                LogWarn($"帧 {frame} 重试仍失败，按策略跳过继续。");
+                                LogWarn($"帧 {frame} 连续失败超过重试上限，跳过继续。");
                                 skipped = true;
                             }
                             break;
@@ -107,7 +111,6 @@ namespace RenderServerGui.Services
 
                         LogWarn($"帧 {frame} 第 {attempt}/{_p.MaxRetryPerFrame} 次重试。");
                         RaiseProgress(completed, total, frame, $"重试中({attempt})");
-                        // 重启前的短暂冷却（当作过热缓冲），可中断
                         if (!SleepCancellable(Math.Min(_p.CooldownSeconds, 15))) break;
                     }
 
@@ -153,10 +156,16 @@ namespace RenderServerGui.Services
                     UseShellExecute = false
                 };
                 try { psi.WorkingDirectory = Path.GetDirectoryName(_p.ExePath); } catch { }
+                try
+                {
+                    string outDir = Path.GetDirectoryName(FrameScanner.FramePath(_p.OutputTemplate, frame));
+                    if (!string.IsNullOrEmpty(outDir)) Directory.CreateDirectory(outDir);
+                }
+                catch { }
 
-                DateTime baseline = ReadReportWriteTime(); // 崩溃基线，避免旧文件误判
+                DateTime baseline = ReadReportWriteTime(); // 崩溃基线，避免旧报告误判
                 process = Process.Start(psi);
-                LogInfo($"启动渲染 帧 {frame}（第 {attempt + 1} 次）PID {process.Id}");
+                LogInfo($"启动渲染 帧 {frame}（第 {attempt + 1} 次）PID {process.Id}  参数: {psi.Arguments}");
 
                 var start = DateTime.Now;
                 int notRespondingStreak = 0;
@@ -165,38 +174,45 @@ namespace RenderServerGui.Services
                 {
                     if (_stopRequested)
                     {
-                        KillAndWait(process);
+                        KillTree(process);
                         return FrameResult.Aborted;
                     }
 
                     if (process.HasExited)
                     {
-                        // 退出码为 0，给产物文件最多 ~3s 落盘缓冲
-                        if (WaitForFrameFile(frame, 3000))
+                        if (FrameScanner.IsFrameRendered(_p.OutputTemplate, frame))
                         {
-                            LogInfo($"帧 {frame} 渲染完成。");
+                            LogInfo($"帧 {frame} 渲染完成（退出码 {SafeExitCode(process)}，产物存在）。");
                             return FrameResult.Success;
                         }
+
                         int code = SafeExitCode(process);
-                        if (ReportChangedAfter(baseline))
-                            LogWarn($"帧 {frame} 进程退出且检测到崩溃报告更新（退出码 {code}），未产出文件。");
-                        else
-                            LogWarn($"帧 {frame} 进程退出但未产出文件（退出码 {code}）。");
+                        string why = ReportChangedAfter(baseline) ? "且检测到崩溃报告更新" : "但产物缺失/为空";
+                        LogWarn($"帧 {frame} 进程退出（码 {code}），{why}。");
                         return FrameResult.Abnormal;
                     }
 
                     double elapsed = (DateTime.Now - start).TotalSeconds;
+
+                    // 项③：超过单帧超时——若产物已生成，判"渲完未退出"→杀树算成功；否则判挂起→杀树重试
                     if (elapsed > _p.FrameTimeoutSeconds)
                     {
-                        LogWarn($"帧 {frame} 渲染超时 {elapsed:F0}s（上限 {_p.FrameTimeoutSeconds}s），判定挂起。");
-                        KillAndWait(process);
+                        if (FrameScanner.IsFrameRendered(_p.OutputTemplate, frame))
+                        {
+                            LogWarn($"帧 {frame} 超时 {elapsed:F0}s 但产物已生成，判为渲完未退出，结束进程并计成功。");
+                            KillTree(process);
+                            return FrameResult.Success;
+                        }
+                        LogWarn($"帧 {frame} 渲染超时 {elapsed:F0}s（上限 {_p.FrameTimeoutSeconds}s）且无产物，判定挂起。");
+                        KillTree(process);
                         return FrameResult.Abnormal;
                     }
 
+                    // 崩溃报告更新（进程仍活）→ 判异常
                     if (ReportChangedAfter(baseline))
                     {
                         LogWarn($"帧 {frame} 检测到异常记录更新，判定崩溃。");
-                        KillAndWait(process);
+                        KillTree(process);
                         return FrameResult.Abnormal;
                     }
 
@@ -210,19 +226,16 @@ namespace RenderServerGui.Services
                             if (notRespondingStreak >= 3)
                             {
                                 LogWarn($"帧 {frame} 进程持续无响应，判定挂起。");
-                                KillAndWait(process);
+                                KillTree(process);
                                 return FrameResult.Abnormal;
                             }
                         }
-                        else
-                        {
-                            notRespondingStreak = 0;
-                        }
+                        else notRespondingStreak = 0;
                     }
 
                     if (!SleepCancellable(_p.FrameCheckIntervalSeconds))
                     {
-                        KillAndWait(process);
+                        KillTree(process);
                         return FrameResult.Aborted;
                     }
                 }
@@ -230,28 +243,60 @@ namespace RenderServerGui.Services
             catch (Exception ex)
             {
                 LogError($"启动/渲染 帧 {frame} 出错: {ex.Message}");
-                try { if (process != null && !process.HasExited) process.Kill(); } catch { }
+                KillTree(process);
                 return FrameResult.Abnormal;
             }
             finally
             {
-                process?.Dispose();
+                try { process?.Dispose(); } catch { }
+            }
+        }
+
+        // ---------- 进程与参数 ----------
+
+        private string BuildArguments(int frame)
+        {
+            string scene = (_p.SceneFile ?? string.Empty).Trim();
+            return scene.Length > 0
+                ? $"-render \"{scene}\" -frame {frame}"
+                : $"-render -frame {frame}";
+        }
+
+        /// <summary>杀掉整棵进程树。.NET Framework 无 Kill(entireProcessTree)，用 taskkill /F /T /PID 兜底并补杀，随后固定较长冷却等待句柄释放。</summary>
+        private void KillTree(Process proc)
+        {
+            int pid = 0;
+            try { if (proc != null) pid = proc.Id; } catch { }
+
+            if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
+            try { if (proc != null && !proc.HasExited) { proc.Kill(); proc.WaitForExit(5000); } } catch { }
+            if (pid > 0) RunTaskKill($"/F /T /PID {pid}"); // 补杀 taskkill 之后才拉起的子进程
+
+            SleepCancellable(KillSettleSeconds);
+        }
+
+        private void RunTaskKill(string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("taskkill")
+                {
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (var pr = Process.Start(psi))
+                {
+                    pr?.WaitForExit(8000);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogWarn($"taskkill 执行失败({arguments}): {ex.Message}");
             }
         }
 
         // ---------- 辅助 ----------
-
-        private bool WaitForFrameFile(int frame, int maxWaitMs)
-        {
-            int waited = 0;
-            while (waited < maxWaitMs)
-            {
-                if (FrameScanner.IsFrameComplete(_p.OutputTemplate, frame)) return true;
-                Thread.Sleep(300);
-                waited += 300;
-            }
-            return FrameScanner.IsFrameComplete(_p.OutputTemplate, frame);
-        }
 
         private DateTime ReadReportWriteTime()
         {
@@ -268,44 +313,15 @@ namespace RenderServerGui.Services
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(_p.ReportPath) || !File.Exists(_p.ReportPath))
-                    return false;
+                if (string.IsNullOrWhiteSpace(_p.ReportPath) || !File.Exists(_p.ReportPath)) return false;
                 return File.GetLastWriteTimeUtc(_p.ReportPath) > baseline;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
 
         private static int SafeExitCode(Process p)
         {
             try { return p.ExitCode; } catch { return int.MinValue; }
-        }
-
-        /// <summary>构造渲染参数： -render "工程.c4d" -frame 帧号。</summary>
-        private string BuildArguments(int frame)
-        {
-            string scene = (_p.SceneFile ?? string.Empty).Trim();
-            return scene.Length > 0
-                ? $"-render \"{scene}\" -frame {frame}"
-                : $"-render -frame {frame}";
-        }
-
-        private void KillAndWait(Process process)
-        {
-            try
-            {
-                if (process != null && !process.HasExited)
-                {
-                    process.Kill();
-                    process.WaitForExit(5000);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"终止渲染进程失败: {ex.Message}");
-            }
         }
 
         private bool SleepCancellable(double seconds)
@@ -325,8 +341,7 @@ namespace RenderServerGui.Services
         {
             IsRunning = false;
             RaiseStatus(status);
-            if (status == RunnerStatus.Error) LogError("调度已因错误停止。");
-            else LogInfo("调度已停止。");
+            LogInfo(status == RunnerStatus.Error ? "调度已因错误停止。" : "调度已停止。");
         }
 
         private void RaiseProgress(int completed, int total, int frame, string stage)
