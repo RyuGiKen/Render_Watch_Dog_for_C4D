@@ -168,7 +168,8 @@ namespace RenderServerGui.Services
                 LogInfo($"启动渲染 帧 {frame}（第 {attempt + 1} 次）PID {process.Id}  参数: {psi.Arguments}");
 
                 var start = DateTime.Now;
-                int notRespondingStreak = 0;
+                int crashStreak = 0;         // 崩溃报告连续异常计数
+                bool loggedNoResp = false;   // 无响应提示只记一次，避免刷屏
 
                 while (true)
                 {
@@ -185,16 +186,19 @@ namespace RenderServerGui.Services
                             LogInfo($"帧 {frame} 渲染完成（退出码 {SafeExitCode(process)}，产物存在）。");
                             return FrameResult.Success;
                         }
-
                         int code = SafeExitCode(process);
                         string why = ReportChangedAfter(baseline) ? "且检测到崩溃报告更新" : "但产物缺失/为空";
-                        LogWarn($"帧 {frame} 进程退出（码 {code}），{why}。");
-                        return FrameResult.Abnormal;
+                        LogWarn($"帧 {frame} 进程已退出（码 {code}），{why}，判为失败并重试。");
+                        return FrameResult.Abnormal; // 闪退/报错：进程已终结，直接算一次失败
                     }
 
                     double elapsed = (DateTime.Now - start).TotalSeconds;
 
-                    // 项③：超过单帧超时——若产物已生成，判"渲完未退出"→杀树算成功；否则判挂起→杀树重试
+                    try { process.Refresh(); } catch { }
+                    bool notResponding = process.MainWindowHandle != IntPtr.Zero
+                                         && !ProcessHealth.IsResponding(process);
+
+                    // 无响应/挂起统一由"单帧超时"这一闸门处理：未超时绝不因无响应杀进程
                     if (elapsed > _p.FrameTimeoutSeconds)
                     {
                         if (FrameScanner.IsFrameRendered(_p.OutputTemplate, frame))
@@ -203,34 +207,40 @@ namespace RenderServerGui.Services
                             KillTree(process);
                             return FrameResult.Success;
                         }
-                        LogWarn($"帧 {frame} 渲染超时 {elapsed:F0}s（上限 {_p.FrameTimeoutSeconds}s）且无产物，判定挂起。");
+                        string cause = notResponding ? "持续无响应" : "长时间未完成";
+                        LogWarn($"帧 {frame} {cause} 直至超过单帧超时 {_p.FrameTimeoutSeconds}s 且无产物，判定挂起，杀进程重试。");
                         KillTree(process);
                         return FrameResult.Abnormal;
                     }
 
-                    // 崩溃报告更新（进程仍活）→ 判异常
+                    // 无响应仅作提示，不计数、不杀（高负载常态）
+                    if (notResponding && !loggedNoResp)
+                    {
+                        LogInfo($"帧 {frame} 当前无响应（高负载常见），不单独处理，持续至超时再判（已运行 {elapsed:F0}s / 上限 {_p.FrameTimeoutSeconds}s）。");
+                        loggedNoResp = true;
+                    }
+                    else if (!notResponding && loggedNoResp)
+                    {
+                        LogInfo($"帧 {frame} 进程恢复响应。");
+                        loggedNoResp = false;
+                    }
+
+                    // 崩溃报告更新：去抖计数，连续达最大重试次数才杀；停止更新则清零。日志显示进度。
                     if (ReportChangedAfter(baseline))
                     {
-                        LogWarn($"帧 {frame} 检测到异常记录更新，判定崩溃。");
-                        KillTree(process);
-                        return FrameResult.Abnormal;
-                    }
-
-                    // 仅对确有主窗口的进程用 Responding 判活（连续多次不响应才处理）
-                    try { process.Refresh(); } catch { }
-                    if (process.MainWindowHandle != IntPtr.Zero)
-                    {
-                        if (!ProcessHealth.IsResponding(process))
+                        crashStreak++;
+                        LogWarn($"帧 {frame} 检测到崩溃报告更新，连续异常 {crashStreak}/{_p.MaxRetryPerFrame}。");
+                        if (crashStreak >= _p.MaxRetryPerFrame)
                         {
-                            notRespondingStreak++;
-                            if (notRespondingStreak >= 3)
-                            {
-                                LogWarn($"帧 {frame} 进程持续无响应，判定挂起。");
-                                KillTree(process);
-                                return FrameResult.Abnormal;
-                            }
+                            LogWarn($"帧 {frame} 连续 {crashStreak} 次异常达上限，判定崩溃，杀进程重试。");
+                            KillTree(process);
+                            return FrameResult.Abnormal;
                         }
-                        else notRespondingStreak = 0;
+                    }
+                    else if (crashStreak > 0)
+                    {
+                        crashStreak = 0;
+                        LogInfo($"帧 {frame} 崩溃报告停止更新，异常计数清零。");
                     }
 
                     if (!SleepCancellable(_p.FrameCheckIntervalSeconds))

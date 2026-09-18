@@ -249,14 +249,14 @@ namespace RenderServerGui.UI
                 if (string.IsNullOrWhiteSpace(p.SceneFile)) { error = "工程文件为空。"; return false; }
                 if (p.StartFrame > p.EndFrame) { error = "起始帧不能大于结束帧。"; return false; }
                 if (string.IsNullOrWhiteSpace(p.OutputTemplate)) { error = "输出模板为空。"; return false; }
-                if (!Regex_HasToken(p.OutputTemplate)) { error = "输出模板缺少帧号占位符，形如 Image_[xxxx].png。"; return false; }
+                if (!Regex_HasToken(p.OutputTemplate)) { error = "输出模板缺少帧号占位符，形如 Image_****.png（星号个数=补零位数）。"; return false; }
             }
             return true;
         }
 
         private static bool Regex_HasToken(string template)
         {
-            return System.Text.RegularExpressions.Regex.IsMatch(template, @"\[x+\]");
+            return System.Text.RegularExpressions.Regex.IsMatch(template, @"\*+");
         }
 
         private void SetRunningUi(bool running)
@@ -354,7 +354,7 @@ namespace RenderServerGui.UI
             }
             if (!Regex_HasToken(p.OutputTemplate))
             {
-                MessageBox.Show(this, "输出模板缺少帧号占位符，应形如 Image_[xxxx].png（x 的个数=补零位数）。",
+                MessageBox.Show(this, "输出模板缺少帧号占位符，应形如 Image_****.png（星号个数=补零位数）。",
                     "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -376,41 +376,23 @@ namespace RenderServerGui.UI
             }
             else
             {
-                bool sOk = FrameScanner.IsFrameRendered(p.OutputTemplate, p.StartFrame);
-                bool eOk = FrameScanner.IsFrameRendered(p.OutputTemplate, p.EndFrame);
-                sb.AppendLine("起始帧成品已生成：" + (sOk ? "是" : "否"));
-                sb.AppendLine("结束帧成品已生成：" + (eOk ? "是" : "否"));
+                // 只按文本命名规则判断：占位星号转成等长的单字符通配 ?，看目录里有无同规则文件
+                string pattern = Path.GetFileName(FrameScanner.ToGlob(p.OutputTemplate));
+                string[] matched = SafeGetFiles(dir, pattern);
 
-                var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { ".png", ".jpg", ".jpeg", ".exr", ".tif", ".tiff", ".bmp", ".psd", ".hdr", ".tga" };
-                List<string> samples = new List<string>();
-                try
-                {
-                    samples = Directory.EnumerateFiles(dir)
-                        .Where(f => exts.Contains(Path.GetExtension(f)))
-                        .Take(3)
-                        .Select(Path.GetFileName)
-                        .ToList();
-                }
-                catch { }
+                sb.AppendLine($"按命名规则 {pattern} 匹配到 {matched.Length} 个文件");
+                foreach (var f in matched.Take(5))
+                    sb.AppendLine("  " + Path.GetFileName(f));
+                if (matched.Length > 5)
+                    sb.AppendLine($"  …等共 {matched.Length} 个");
+                sb.AppendLine();
 
-                if (samples.Count > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("目录内图片文件示例（用于核对命名）：");
-                    foreach (var s in samples) sb.AppendLine("  " + s);
-
-                    if (!sOk && !eOk)
-                    {
-                        sb.AppendLine();
-                        sb.AppendLine("⚠ 目录里有图片，但没有匹配模板的成品：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照示例修正模板。");
-                    }
-                }
+                if (matched.Length > 0)
+                    sb.AppendLine("✓ 目录里存在同一命名规则的文件，模板可用。");
+                else if (CountFiles(dir) > 0)
+                    sb.AppendLine("⚠ 目录里有文件，但没有匹配该命名规则的：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照示例文件名修正模板。");
                 else
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("（输出目录内暂无图片文件——全新任务属正常）");
-                }
+                    sb.AppendLine("（输出目录为空——全新任务属正常）");
             }
 
             MessageBox.Show(this, sb.ToString(), "输出文件预览 / 校验", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -471,7 +453,7 @@ namespace RenderServerGui.UI
 
                 // 仅替换模板的目录部分，保留文件名（含帧号占位符）
                 string file = Path.GetFileName(txtFrOutput.Text.Trim());
-                if (string.IsNullOrEmpty(file)) file = "Image_[xxxx].png";
+                if (string.IsNullOrEmpty(file)) file = "Image_****.png";
                 txtFrOutput.Text = Path.Combine(dlg.SelectedPath, file);
             }
         }
@@ -480,6 +462,18 @@ namespace RenderServerGui.UI
         {
             if (string.IsNullOrWhiteSpace(path)) return null;
             try { return Path.GetDirectoryName(path); } catch { return null; }
+        }
+
+        private static string[] SafeGetFiles(string dir, string pattern)
+        {
+            try { return Directory.GetFiles(dir, pattern); }
+            catch { return new string[0]; }
+        }
+
+        private static int CountFiles(string dir)
+        {
+            try { return Directory.GetFiles(dir).Length; }
+            catch { return 0; }
         }
 
         private void TryFill(TextBox target, OpenFileDialog dlg, string initialDir)

@@ -51,8 +51,9 @@ namespace RenderServerGui.Models
         public string SceneFile { get; set; }
 
         /// <summary>
-        /// 输出文件命名模板，帧号占位符写作 [x..]（x 的个数即补零位数）。
-        /// 例：D:\Output\Image_[xxxx].png，第 0 帧展开为 D:\Output\Image_0000.png。
+        /// 输出文件命名模板，帧号占位符写作一段连续的星号（如 ****），星号个数即补零位数。
+        /// 用星号是因为文件名不允许含 *，不会与真实产物冲突。
+        /// 例：D:\Output\Image_****.png，第 0 帧展开为 D:\Output\Image_0000.png。
         /// </summary>
         public string OutputTemplate { get; set; }
 
@@ -96,7 +97,7 @@ namespace RenderServerGui.Models
                 RestMinutes = 3,
                 ClearCache = true,
 
-                OutputTemplate = @"D:\Output\Image_[xxxx].png",
+                OutputTemplate = @"D:\Output\Image_****.png",
                 StartFrame = 0,
                 EndFrame = 100,
                 CooldownSeconds = 60,
