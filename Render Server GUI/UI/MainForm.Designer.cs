@@ -173,7 +173,7 @@ namespace RenderServerGui.UI
             this.panelParams.Controls.Add(this.grpFrame);
             this.panelParams.Location = new System.Drawing.Point(0, 56);
             this.panelParams.Name = "panelParams";
-            this.panelParams.Size = new System.Drawing.Size(940, 460);
+            this.panelParams.Size = new System.Drawing.Size(484, 428);
 
             // grpTeamRender
             this.grpTeamRender.Controls.Add(this.lblTrExe);
@@ -313,16 +313,16 @@ namespace RenderServerGui.UI
             this.panelLog.Controls.Add(this.lblLogTitle);
             this.panelLog.Controls.Add(this.btnClearLog);
             this.panelLog.Controls.Add(this.rtbLog);
-            this.panelLog.Location = new System.Drawing.Point(0, 516);
+            this.panelLog.Location = new System.Drawing.Point(488, 56);
             this.panelLog.Name = "panelLog";
-            this.panelLog.Size = new System.Drawing.Size(940, 204);
+            this.panelLog.Size = new System.Drawing.Size(452, 428);
 
             this.lblLogTitle.AutoSize = true;
             this.lblLogTitle.Location = new System.Drawing.Point(12, 8);
             this.lblLogTitle.Name = "lblLogTitle";
             this.lblLogTitle.Text = "运行日志";
 
-            this.btnClearLog.Location = new System.Drawing.Point(836, 4);
+            this.btnClearLog.Location = new System.Drawing.Point(348, 6);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(96, 24);
             this.btnClearLog.Text = "清空日志";
@@ -334,13 +334,13 @@ namespace RenderServerGui.UI
             this.rtbLog.Name = "rtbLog";
             this.rtbLog.ReadOnly = true;
             this.rtbLog.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.rtbLog.Size = new System.Drawing.Size(916, 166);
-            this.rtbLog.WordWrap = false;
+            this.rtbLog.Size = new System.Drawing.Size(432, 390);
+            this.rtbLog.WordWrap = true;
 
             // MainForm
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(940, 720);
+            this.ClientSize = new System.Drawing.Size(940, 490);
             this.Controls.Add(this.panelTop);
             this.Controls.Add(this.panelParams);
             this.Controls.Add(this.panelLog);

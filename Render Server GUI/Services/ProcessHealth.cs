@@ -54,8 +54,8 @@ namespace RenderServerGui.Services
         }
 
         /// <summary>
-        /// 异常记录文件是否在近期被改写。用 LastWriteTimeUtc，未来时间戳直接视为不活跃。
-        /// 与 Watch Dog 原逻辑一致（窗口按 *2.5 倍余量放宽）。
+        /// 异常记录文件是否在给定有效窗口内被改写。用 LastWriteTimeUtc，未来时间戳直接视为不活跃。
+        /// 判定窗口完全由调用方传入：看门狗传 CheckIntervalSeconds*(MaxHang+1.5)，逐帧引擎另用基线法。
         /// </summary>
         public static bool IsBugReportRecent(string filePath, TimeSpan activeInterval)
         {
@@ -69,7 +69,7 @@ namespace RenderServerGui.Services
                 if (lastWrite > now)
                     return false;
 
-                return (now - lastWrite).TotalSeconds < activeInterval.TotalSeconds * 2.5f;
+                return (now - lastWrite) < activeInterval;
             }
             catch
             {
