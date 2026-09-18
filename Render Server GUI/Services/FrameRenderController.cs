@@ -35,7 +35,7 @@ namespace RenderServerGui.Services
             IsRunning = true;
             RaiseStatus(RunnerStatus.Running);
 
-            LogInfo($"逐帧渲染启动：{_p.ExePath} -render [帧]");
+            LogInfo($"逐帧渲染启动：{_p.ExePath} -render \"{_p.SceneFile}\" -frame [帧]");
             LogInfo($"帧范围 {_p.StartFrame}–{_p.EndFrame}，输出模板 {_p.OutputTemplate}");
             LogInfo($"帧间冷却 {_p.CooldownSeconds}s，单帧超时 {_p.FrameTimeoutSeconds}s，检查间隔 {_p.FrameCheckIntervalSeconds}s，最大重试 {_p.MaxRetryPerFrame}");
 
@@ -149,7 +149,7 @@ namespace RenderServerGui.Services
                 var psi = new ProcessStartInfo
                 {
                     FileName = _p.ExePath,
-                    Arguments = $"-render {frame}",
+                    Arguments = BuildArguments(frame),
                     UseShellExecute = false
                 };
                 try { psi.WorkingDirectory = Path.GetDirectoryName(_p.ExePath); } catch { }
@@ -281,6 +281,15 @@ namespace RenderServerGui.Services
         private static int SafeExitCode(Process p)
         {
             try { return p.ExitCode; } catch { return int.MinValue; }
+        }
+
+        /// <summary>构造渲染参数： -render "工程.c4d" -frame 帧号。</summary>
+        private string BuildArguments(int frame)
+        {
+            string scene = (_p.SceneFile ?? string.Empty).Trim();
+            return scene.Length > 0
+                ? $"-render \"{scene}\" -frame {frame}"
+                : $"-render -frame {frame}";
         }
 
         private void KillAndWait(Process process)

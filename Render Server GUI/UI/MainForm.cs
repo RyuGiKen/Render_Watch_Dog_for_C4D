@@ -64,6 +64,7 @@ namespace RenderServerGui.UI
             btnTrReport.Click += (s, e) => BrowseReport(txtTrReport);
             btnFrReport.Click += (s, e) => BrowseReport(txtFrReport);
             btnTrCache.Click += (s, e) => BrowseFolder(txtTrCache);
+            btnFrScene.Click += (s, e) => BrowseScene(txtFrScene);
             btnFrOutput.Click += (s, e) => BrowseOutputFolder();
 
             FormClosing += OnFormClosingHandler;
@@ -124,6 +125,7 @@ namespace RenderServerGui.UI
             if (frame)
             {
                 txtFrExe.Text = p.ExePath;
+                txtFrScene.Text = p.SceneFile;
                 txtFrProc.Text = p.ProcessName;
                 txtFrReport.Text = p.ReportPath;
                 txtFrOutput.Text = p.OutputTemplate;
@@ -166,6 +168,7 @@ namespace RenderServerGui.UI
             if (IsFrameMode(mode))
             {
                 p.ExePath = txtFrExe.Text.Trim();
+                p.SceneFile = txtFrScene.Text.Trim();
                 p.ProcessName = txtFrProc.Text.Trim();
                 p.ReportPath = txtFrReport.Text.Trim();
                 p.OutputTemplate = txtFrOutput.Text.Trim();
@@ -239,6 +242,7 @@ namespace RenderServerGui.UI
 
             if (IsFrameMode(_cfg.Mode))
             {
+                if (string.IsNullOrWhiteSpace(p.SceneFile)) { error = "工程文件为空。"; return false; }
                 if (p.StartFrame > p.EndFrame) { error = "起始帧不能大于结束帧。"; return false; }
                 if (string.IsNullOrWhiteSpace(p.OutputTemplate)) { error = "输出模板为空。"; return false; }
                 if (!Regex_HasToken(p.OutputTemplate)) { error = "输出模板缺少帧号占位符，形如 Image_[xxxx].png。"; return false; }
@@ -344,6 +348,17 @@ namespace RenderServerGui.UI
             {
                 dlg.Title = "选择异常记录文件";
                 dlg.Filter = "BugReport (_BugReport.txt)|_BugReport.txt|所有文件 (*.*)|*.*";
+                dlg.CheckFileExists = false;
+                TryFill(target, dlg, initialDirOf(target.Text));
+            }
+        }
+
+        private void BrowseScene(TextBox target)
+        {
+            using (var dlg = new OpenFileDialog())
+            {
+                dlg.Title = "选择工程文件";
+                dlg.Filter = "Cinema 4D 工程 (*.c4d)|*.c4d|所有文件 (*.*)|*.*";
                 dlg.CheckFileExists = false;
                 TryFill(target, dlg, initialDirOf(target.Text));
             }

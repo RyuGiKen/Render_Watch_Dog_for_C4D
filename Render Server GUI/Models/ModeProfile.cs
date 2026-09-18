@@ -46,6 +46,11 @@ namespace RenderServerGui.Models
         // ---------- 逐帧模式专用 ----------
 
         /// <summary>
+        /// 工程文件完整路径（*.c4d）。逐帧命令行形如： exe -render "工程.c4d" -frame 帧号。
+        /// </summary>
+        public string SceneFile { get; set; }
+
+        /// <summary>
         /// 输出文件命名模板，帧号占位符写作 [x..]（x 的个数即补零位数）。
         /// 例：D:\Output\Image_[xxxx].png，第 0 帧展开为 D:\Output\Image_0000.png。
         /// </summary>
@@ -114,12 +119,14 @@ namespace RenderServerGui.Models
                     profile.ExePath = exeDir + @"\Cinema 4D.exe";
                     profile.ProcessName = "Cinema 4D";
                     profile.ReportPath = roaming + @"\Maxon Cinema 4D 2026_1ABCDC12\_bugreports\_BugReport.txt";
+                    profile.SceneFile = @"D:\Proj\scene.c4d";
                     break;
 
                 case RenderMode.Commandline:
                     profile.ExePath = exeDir + @"\Commandline.exe";
                     profile.ProcessName = "Commandline";
                     profile.ReportPath = roaming + @"\Maxon Cinema 4D 2026_1ABCDC12_X\_bugreports\_BugReport.txt";
+                    profile.SceneFile = @"D:\Proj\scene.c4d";
                     break;
             }
 

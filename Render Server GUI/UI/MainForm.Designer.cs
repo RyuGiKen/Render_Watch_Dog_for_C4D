@@ -58,6 +58,9 @@ namespace RenderServerGui.UI
             this.lblFrExe = new System.Windows.Forms.Label();
             this.txtFrExe = new System.Windows.Forms.TextBox();
             this.btnFrExe = new System.Windows.Forms.Button();
+            this.lblFrScene = new System.Windows.Forms.Label();
+            this.txtFrScene = new System.Windows.Forms.TextBox();
+            this.btnFrScene = new System.Windows.Forms.Button();
             this.lblFrProc = new System.Windows.Forms.Label();
             this.txtFrProc = new System.Windows.Forms.TextBox();
             this.lblFrReport = new System.Windows.Forms.Label();
@@ -208,39 +211,42 @@ namespace RenderServerGui.UI
             this.txtTrExe.Location = new System.Drawing.Point(150, 28); this.txtTrExe.Name = "txtTrExe"; this.txtTrExe.Size = new System.Drawing.Size(270, 23);
             this.btnTrExe.Location = new System.Drawing.Point(426, 27); this.btnTrExe.Name = "btnTrExe"; this.btnTrExe.Size = new System.Drawing.Size(30, 25); this.btnTrExe.Text = "…"; this.btnTrExe.UseVisualStyleBackColor = true;
 
-            this.lblTrProc.AutoSize = true; this.lblTrProc.Location = new System.Drawing.Point(14, 66); this.lblTrProc.Name = "lblTrProc"; this.lblTrProc.Text = "进程名称";
-            this.txtTrProc.Location = new System.Drawing.Point(150, 62); this.txtTrProc.Name = "txtTrProc"; this.txtTrProc.Size = new System.Drawing.Size(306, 23);
+            this.lblTrProc.AutoSize = true; this.lblTrProc.Location = new System.Drawing.Point(14, 64); this.lblTrProc.Name = "lblTrProc"; this.lblTrProc.Text = "进程名称";
+            this.txtTrProc.Location = new System.Drawing.Point(150, 60); this.txtTrProc.Name = "txtTrProc"; this.txtTrProc.Size = new System.Drawing.Size(306, 23);
 
-            this.lblTrPort.AutoSize = true; this.lblTrPort.Location = new System.Drawing.Point(14, 100); this.lblTrPort.Name = "lblTrPort"; this.lblTrPort.Text = "端口";
-            this.numTrPort.Location = new System.Drawing.Point(150, 96); this.numTrPort.Name = "numTrPort"; this.numTrPort.Size = new System.Drawing.Size(100, 23);
+            this.lblTrReport.AutoSize = true; this.lblTrReport.Location = new System.Drawing.Point(14, 96); this.lblTrReport.Name = "lblTrReport"; this.lblTrReport.Text = "异常记录文件";
+            this.txtTrReport.Location = new System.Drawing.Point(150, 92); this.txtTrReport.Name = "txtTrReport"; this.txtTrReport.Size = new System.Drawing.Size(270, 23);
+            this.btnTrReport.Location = new System.Drawing.Point(426, 91); this.btnTrReport.Name = "btnTrReport"; this.btnTrReport.Size = new System.Drawing.Size(30, 25); this.btnTrReport.Text = "…"; this.btnTrReport.UseVisualStyleBackColor = true;
 
-            this.lblTrInterval.AutoSize = true; this.lblTrInterval.Location = new System.Drawing.Point(14, 134); this.lblTrInterval.Name = "lblTrInterval"; this.lblTrInterval.Text = "检查间隔(秒)";
-            this.numTrInterval.Location = new System.Drawing.Point(150, 130); this.numTrInterval.Name = "numTrInterval"; this.numTrInterval.Size = new System.Drawing.Size(100, 23);
+            this.lblTrCache.AutoSize = true; this.lblTrCache.Location = new System.Drawing.Point(14, 128); this.lblTrCache.Name = "lblTrCache"; this.lblTrCache.Text = "缓存目录";
+            this.txtTrCache.Location = new System.Drawing.Point(150, 124); this.txtTrCache.Name = "txtTrCache"; this.txtTrCache.Size = new System.Drawing.Size(270, 23);
+            this.btnTrCache.Location = new System.Drawing.Point(426, 123); this.btnTrCache.Name = "btnTrCache"; this.btnTrCache.Size = new System.Drawing.Size(30, 25); this.btnTrCache.Text = "…"; this.btnTrCache.UseVisualStyleBackColor = true;
 
-            this.lblTrHang.AutoSize = true; this.lblTrHang.Location = new System.Drawing.Point(14, 168); this.lblTrHang.Name = "lblTrHang"; this.lblTrHang.Text = "最大挂起次数";
-            this.numTrHang.Location = new System.Drawing.Point(150, 164); this.numTrHang.Name = "numTrHang"; this.numTrHang.Size = new System.Drawing.Size(100, 23);
+            this.lblTrPort.AutoSize = true; this.lblTrPort.Location = new System.Drawing.Point(14, 160); this.lblTrPort.Name = "lblTrPort"; this.lblTrPort.Text = "端口";
+            this.numTrPort.Location = new System.Drawing.Point(150, 156); this.numTrPort.Name = "numTrPort"; this.numTrPort.Size = new System.Drawing.Size(100, 23);
 
-            this.lblTrWork.AutoSize = true; this.lblTrWork.Location = new System.Drawing.Point(14, 202); this.lblTrWork.Name = "lblTrWork"; this.lblTrWork.Text = "连续工作(分)";
-            this.numTrWork.Location = new System.Drawing.Point(150, 198); this.numTrWork.Name = "numTrWork"; this.numTrWork.Size = new System.Drawing.Size(100, 23);
+            this.lblTrInterval.AutoSize = true; this.lblTrInterval.Location = new System.Drawing.Point(14, 192); this.lblTrInterval.Name = "lblTrInterval"; this.lblTrInterval.Text = "检查间隔(秒)";
+            this.numTrInterval.Location = new System.Drawing.Point(150, 188); this.numTrInterval.Name = "numTrInterval"; this.numTrInterval.Size = new System.Drawing.Size(100, 23);
 
-            this.lblTrRest.AutoSize = true; this.lblTrRest.Location = new System.Drawing.Point(14, 236); this.lblTrRest.Name = "lblTrRest"; this.lblTrRest.Text = "休息时长(分)";
-            this.numTrRest.Location = new System.Drawing.Point(150, 232); this.numTrRest.Name = "numTrRest"; this.numTrRest.Size = new System.Drawing.Size(100, 23);
+            this.lblTrHang.AutoSize = true; this.lblTrHang.Location = new System.Drawing.Point(14, 224); this.lblTrHang.Name = "lblTrHang"; this.lblTrHang.Text = "最大挂起次数";
+            this.numTrHang.Location = new System.Drawing.Point(150, 220); this.numTrHang.Name = "numTrHang"; this.numTrHang.Size = new System.Drawing.Size(100, 23);
 
-            this.lblTrReport.AutoSize = true; this.lblTrReport.Location = new System.Drawing.Point(14, 270); this.lblTrReport.Name = "lblTrReport"; this.lblTrReport.Text = "异常记录文件";
-            this.txtTrReport.Location = new System.Drawing.Point(150, 266); this.txtTrReport.Name = "txtTrReport"; this.txtTrReport.Size = new System.Drawing.Size(270, 23);
-            this.btnTrReport.Location = new System.Drawing.Point(426, 265); this.btnTrReport.Name = "btnTrReport"; this.btnTrReport.Size = new System.Drawing.Size(30, 25); this.btnTrReport.Text = "…"; this.btnTrReport.UseVisualStyleBackColor = true;
+            this.lblTrWork.AutoSize = true; this.lblTrWork.Location = new System.Drawing.Point(14, 256); this.lblTrWork.Name = "lblTrWork"; this.lblTrWork.Text = "连续工作(分)";
+            this.numTrWork.Location = new System.Drawing.Point(150, 252); this.numTrWork.Name = "numTrWork"; this.numTrWork.Size = new System.Drawing.Size(100, 23);
 
-            this.lblTrCache.AutoSize = true; this.lblTrCache.Location = new System.Drawing.Point(14, 304); this.lblTrCache.Name = "lblTrCache"; this.lblTrCache.Text = "缓存目录";
-            this.txtTrCache.Location = new System.Drawing.Point(150, 300); this.txtTrCache.Name = "txtTrCache"; this.txtTrCache.Size = new System.Drawing.Size(270, 23);
-            this.btnTrCache.Location = new System.Drawing.Point(426, 299); this.btnTrCache.Name = "btnTrCache"; this.btnTrCache.Size = new System.Drawing.Size(30, 25); this.btnTrCache.Text = "…"; this.btnTrCache.UseVisualStyleBackColor = true;
+            this.lblTrRest.AutoSize = true; this.lblTrRest.Location = new System.Drawing.Point(14, 288); this.lblTrRest.Name = "lblTrRest"; this.lblTrRest.Text = "休息时长(分)";
+            this.numTrRest.Location = new System.Drawing.Point(150, 284); this.numTrRest.Name = "numTrRest"; this.numTrRest.Size = new System.Drawing.Size(100, 23);
 
             this.chkTrClearCache.AutoSize = true; this.chkTrClearCache.Checked = true; this.chkTrClearCache.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkTrClearCache.Location = new System.Drawing.Point(150, 338); this.chkTrClearCache.Name = "chkTrClearCache"; this.chkTrClearCache.Text = "启动前清空缓存目录";
+            this.chkTrClearCache.Location = new System.Drawing.Point(150, 320); this.chkTrClearCache.Name = "chkTrClearCache"; this.chkTrClearCache.Text = "启动前清空缓存目录";
 
             // grpFrame
             this.grpFrame.Controls.Add(this.lblFrExe);
             this.grpFrame.Controls.Add(this.txtFrExe);
             this.grpFrame.Controls.Add(this.btnFrExe);
+            this.grpFrame.Controls.Add(this.lblFrScene);
+            this.grpFrame.Controls.Add(this.txtFrScene);
+            this.grpFrame.Controls.Add(this.btnFrScene);
             this.grpFrame.Controls.Add(this.lblFrProc);
             this.grpFrame.Controls.Add(this.txtFrProc);
             this.grpFrame.Controls.Add(this.lblFrReport);
@@ -274,40 +280,43 @@ namespace RenderServerGui.UI
             this.txtFrExe.Location = new System.Drawing.Point(150, 28); this.txtFrExe.Name = "txtFrExe"; this.txtFrExe.Size = new System.Drawing.Size(270, 23);
             this.btnFrExe.Location = new System.Drawing.Point(426, 27); this.btnFrExe.Name = "btnFrExe"; this.btnFrExe.Size = new System.Drawing.Size(30, 25); this.btnFrExe.Text = "…"; this.btnFrExe.UseVisualStyleBackColor = true;
 
-            this.lblFrProc.AutoSize = true; this.lblFrProc.Location = new System.Drawing.Point(14, 66); this.lblFrProc.Name = "lblFrProc"; this.lblFrProc.Text = "进程名称";
-            this.txtFrProc.Location = new System.Drawing.Point(150, 62); this.txtFrProc.Name = "txtFrProc"; this.txtFrProc.Size = new System.Drawing.Size(306, 23);
+            this.lblFrProc.AutoSize = true; this.lblFrProc.Location = new System.Drawing.Point(14, 64); this.lblFrProc.Name = "lblFrProc"; this.lblFrProc.Text = "进程名称";
+            this.txtFrProc.Location = new System.Drawing.Point(150, 60); this.txtFrProc.Name = "txtFrProc"; this.txtFrProc.Size = new System.Drawing.Size(306, 23);
 
-            this.lblFrReport.AutoSize = true; this.lblFrReport.Location = new System.Drawing.Point(14, 100); this.lblFrReport.Name = "lblFrReport"; this.lblFrReport.Text = "异常记录文件";
-            this.txtFrReport.Location = new System.Drawing.Point(150, 96); this.txtFrReport.Name = "txtFrReport"; this.txtFrReport.Size = new System.Drawing.Size(270, 23);
-            this.btnFrReport.Location = new System.Drawing.Point(426, 95); this.btnFrReport.Name = "btnFrReport"; this.btnFrReport.Size = new System.Drawing.Size(30, 25); this.btnFrReport.Text = "…"; this.btnFrReport.UseVisualStyleBackColor = true;
+            this.lblFrReport.AutoSize = true; this.lblFrReport.Location = new System.Drawing.Point(14, 96); this.lblFrReport.Name = "lblFrReport"; this.lblFrReport.Text = "异常记录文件";
+            this.txtFrReport.Location = new System.Drawing.Point(150, 92); this.txtFrReport.Name = "txtFrReport"; this.txtFrReport.Size = new System.Drawing.Size(270, 23);
+            this.btnFrReport.Location = new System.Drawing.Point(426, 91); this.btnFrReport.Name = "btnFrReport"; this.btnFrReport.Size = new System.Drawing.Size(30, 25); this.btnFrReport.Text = "…"; this.btnFrReport.UseVisualStyleBackColor = true;
 
-            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 134); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
-            this.txtFrOutput.Location = new System.Drawing.Point(150, 130); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(270, 23);
-            this.btnFrOutput.Location = new System.Drawing.Point(426, 129); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
+            this.lblFrScene.AutoSize = true; this.lblFrScene.Location = new System.Drawing.Point(14, 128); this.lblFrScene.Name = "lblFrScene"; this.lblFrScene.Text = "工程文件";
+            this.txtFrScene.Location = new System.Drawing.Point(150, 124); this.txtFrScene.Name = "txtFrScene"; this.txtFrScene.Size = new System.Drawing.Size(270, 23);
+            this.btnFrScene.Location = new System.Drawing.Point(426, 123); this.btnFrScene.Name = "btnFrScene"; this.btnFrScene.Size = new System.Drawing.Size(30, 25); this.btnFrScene.Text = "…"; this.btnFrScene.UseVisualStyleBackColor = true;
 
-            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 168); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "起始帧";
-            this.numFrStart.Location = new System.Drawing.Point(150, 164); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(100, 23);
+            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 160); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
+            this.txtFrOutput.Location = new System.Drawing.Point(150, 156); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(270, 23);
+            this.btnFrOutput.Location = new System.Drawing.Point(426, 155); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
 
-            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(14, 202); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "结束帧";
-            this.numFrEnd.Location = new System.Drawing.Point(150, 198); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(100, 23);
+            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 192); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起-止)";
+            this.numFrStart.Location = new System.Drawing.Point(150, 188); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
+            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(240, 192); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "–";
+            this.numFrEnd.Location = new System.Drawing.Point(256, 188); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
 
-            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 236); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
-            this.numFrCooldown.Location = new System.Drawing.Point(150, 232); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(100, 23);
+            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 224); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
+            this.numFrCooldown.Location = new System.Drawing.Point(150, 220); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 270); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "单帧超时(秒)";
-            this.numFrTimeout.Location = new System.Drawing.Point(150, 266); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(100, 23);
+            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 256); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "单帧超时(秒)";
+            this.numFrTimeout.Location = new System.Drawing.Point(150, 252); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(14, 304); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
-            this.numFrInterval.Location = new System.Drawing.Point(150, 300); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(100, 23);
+            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(14, 288); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
+            this.numFrInterval.Location = new System.Drawing.Point(150, 284); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 338); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大重试次数";
-            this.numFrRetry.Location = new System.Drawing.Point(150, 334); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(100, 23);
+            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 320); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大重试次数";
+            this.numFrRetry.Location = new System.Drawing.Point(150, 316); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 372); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
+            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 352); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
             this.cmbFrOnFail.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbFrOnFail.FormattingEnabled = true;
             this.cmbFrOnFail.Items.AddRange(new object[] { "停止并告警", "跳过继续" });
-            this.cmbFrOnFail.Location = new System.Drawing.Point(150, 368); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(150, 25);
+            this.cmbFrOnFail.Location = new System.Drawing.Point(150, 348); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(150, 25);
 
             // panelLog
             this.panelLog.Controls.Add(this.lblLogTitle);
@@ -414,6 +423,9 @@ namespace RenderServerGui.UI
         private System.Windows.Forms.Label lblFrExe;
         private System.Windows.Forms.TextBox txtFrExe;
         private System.Windows.Forms.Button btnFrExe;
+        private System.Windows.Forms.Label lblFrScene;
+        private System.Windows.Forms.TextBox txtFrScene;
+        private System.Windows.Forms.Button btnFrScene;
         private System.Windows.Forms.Label lblFrProc;
         private System.Windows.Forms.TextBox txtFrProc;
         private System.Windows.Forms.Label lblFrReport;

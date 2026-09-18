@@ -107,7 +107,8 @@ namespace RenderServerGui.Models
                 {
                     serializer.Serialize(fs, this);
                 }
-                File.Move(tmp, path); // 原子替换，避免半写损坏
+                // File.Copy overwrite=true 才能重复保存；File.Move 在目标已存在时会抛异常
+                File.Copy(tmp, path, true);
                 return true;
             }
             catch (Exception ex)
