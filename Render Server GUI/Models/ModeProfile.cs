@@ -69,13 +69,16 @@ namespace RenderServerGui.Models
         /// <summary>单帧最长渲染时间（秒），超过即判挂起并重启本帧。</summary>
         public int FrameTimeoutSeconds { get; set; }
 
-        /// <summary>单帧模式健康轮询间隔（秒）。</summary>
+        /// <summary>单帧模式轮询检查间隔（秒）。</summary>
         public int FrameCheckIntervalSeconds { get; set; }
 
-        /// <summary>单帧最大重试次数。</summary>
-        public int MaxRetryPerFrame { get; set; }
+        /// <summary>内层监控：连续异常计数的上限，达到即判本次尝试失败（沿用 Team Render 去抖思路）。</summary>
+        public int MaxAbnormalCount { get; set; }
 
-        /// <summary>达到最大重试后对失败帧的处理策略。</summary>
+        /// <summary>外层：同一帧最多重启尝试的次数，达到即按策略跳过/停止。</summary>
+        public int MaxFrameFailCount { get; set; }
+
+        /// <summary>达到帧最大失败次数后对失败帧的处理策略。</summary>
         public OnFailBehaviour OnFail { get; set; }
 
         /// <summary>
@@ -102,8 +105,9 @@ namespace RenderServerGui.Models
                 EndFrame = 100,
                 CooldownSeconds = 60,
                 FrameTimeoutSeconds = 600,
-                FrameCheckIntervalSeconds = 60,
-                MaxRetryPerFrame = 4,
+                FrameCheckIntervalSeconds = 30,
+                MaxAbnormalCount = 5,
+                MaxFrameFailCount = 4,
                 OnFail = OnFailBehaviour.Skip
             };
 

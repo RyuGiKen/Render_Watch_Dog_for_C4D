@@ -44,7 +44,8 @@ namespace RenderServerGui.UI
             SetRange(numFrCooldown, 0, 86400);
             SetRange(numFrTimeout, 1, 86400);
             SetRange(numFrInterval, 1, 86400);
-            SetRange(numFrRetry, 0, 999);
+            SetRange(numFrRetry, 1, 999);
+            SetRange(numFrFail, 1, 999);
         }
 
         private static void SetRange(NumericUpDown num, int min, int max)
@@ -138,7 +139,8 @@ namespace RenderServerGui.UI
                 numFrCooldown.Value = Clamp(p.CooldownSeconds, numFrCooldown);
                 numFrTimeout.Value = Clamp(p.FrameTimeoutSeconds, numFrTimeout);
                 numFrInterval.Value = Clamp(p.FrameCheckIntervalSeconds, numFrInterval);
-                numFrRetry.Value = Clamp(p.MaxRetryPerFrame, numFrRetry);
+                numFrRetry.Value = Clamp(p.MaxAbnormalCount, numFrRetry);
+                numFrFail.Value = Clamp(p.MaxFrameFailCount, numFrFail);
                 cmbFrOnFail.SelectedIndex = p.OnFail == OnFailBehaviour.Stop ? 0 : 1;
             }
             else
@@ -181,7 +183,8 @@ namespace RenderServerGui.UI
                 p.CooldownSeconds = (int)numFrCooldown.Value;
                 p.FrameTimeoutSeconds = (int)numFrTimeout.Value;
                 p.FrameCheckIntervalSeconds = (int)numFrInterval.Value;
-                p.MaxRetryPerFrame = (int)numFrRetry.Value;
+                p.MaxAbnormalCount = (int)numFrRetry.Value;
+                p.MaxFrameFailCount = (int)numFrFail.Value;
                 p.OnFail = cmbFrOnFail.SelectedIndex == 1 ? OnFailBehaviour.Skip : OnFailBehaviour.Stop;
             }
             else

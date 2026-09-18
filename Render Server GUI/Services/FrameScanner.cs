@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -53,6 +54,27 @@ namespace RenderServerGui.Services
                 string path = ExpandTemplate(template, frame);
                 var fi = new FileInfo(path);
                 return fi.Exists && fi.Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 该帧产物是否"已落定"：存在、非空、且距最后写入已过 minAgeSeconds 秒。
+        /// 用于确认渲染真正写完（避开正在写入的半截文件）；minAgeSeconds&lt;=0 时等价于 IsFrameRendered。
+        /// </summary>
+        public static bool IsFrameSettled(string template, int frame, int minAgeSeconds)
+        {
+            try
+            {
+                string path = ExpandTemplate(template, frame);
+                var fi = new FileInfo(path);
+                if (!fi.Exists || fi.Length <= 0) return false;
+                if (minAgeSeconds <= 0) return true;
+                double age = (DateTime.UtcNow - fi.LastWriteTimeUtc).TotalSeconds;
+                return age >= minAgeSeconds;
             }
             catch
             {
