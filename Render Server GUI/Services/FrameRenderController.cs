@@ -18,9 +18,9 @@ namespace RenderServerGui.Services
     ///  2) 否则计"异常计数"（沿用 Team Render 去抖）：崩溃报告在时窗内 / 单帧超时无产物 / 无响应且超时 / 已退出且无产物 → +1；
     ///     纯无响应未超时、或运行正常 → 清零；进程已退出但产物仍在写(未落定) → 挂起等待，不计异常也不误判成功。
     ///     异常计数达"最大异常次数" → 判本次尝试失败。
-    ///  3) 外层：尝试失败 → 帧失败计数+1；达"帧最大失败次数" → 按策略跳过/停止；否则空载冷却后重启同一帧。
+    ///  3) 外层：尝试失败 → 帧失败计数+1；达"帧最大失败次数" → 按策略跳过/停止；否则重启同一帧。
     ///
-    /// 时间参数：轮询=检查间隔；启动/重启前的空载冷却与产物落定等待=帧间冷却；单帧超时独立。
+    /// 时间参数：启动后首轮以"帧间冷却"作加载宽限(期间不检测)，之后每轮=检查间隔；产物落定需距最后写入≥冷却秒；单帧超时独立。
     /// 无窗口进程（Commandline.exe）不检测 Responding；挂起统一由单帧超时收口。
     /// </summary>
     public class FrameRenderController : IRenderController
@@ -99,9 +99,6 @@ namespace RenderServerGui.Services
                     while (!frameDone && !frameSkipped)
                     {
                         if (_stopRequested) break;
-
-                        // 启动前空载冷却（也是重启前缓冲），期间无渲染 → 真正降温
-                        if (!SleepIdle(_p.CooldownSeconds)) break;
 
                         AttemptOutcome outcome = RunAttempt(frame, frameFail);
 
@@ -187,14 +184,21 @@ namespace RenderServerGui.Services
                 var crashWindow = TimeSpan.FromSeconds(_p.FrameCheckIntervalSeconds * (_p.MaxAbnormalCount + 1.5)); // 与 Team Render 同款时窗
                 int abnormal = 0;
                 bool loggedNoResp = false;
+                bool firstTick = true; // 启动后首轮用"冷却"跳过加载期，期间不检测
 
                 while (true)
                 {
-                    // 每 tick 先做间隔等待；其间收到停止即中止
-                    if (!SleepIdle(_p.FrameCheckIntervalSeconds))
+                    // 首轮=冷却宽限(加载期不检测)，之后每轮=检查间隔；等待期间收到停止即中止
+                    if (!SleepIdle(firstTick ? _p.CooldownSeconds : _p.FrameCheckIntervalSeconds))
                     {
                         KillTree(process);
                         return AttemptOutcome.Abort;
+                    }
+                    if (firstTick)
+                    {
+                        firstTick = false;
+                        if (_stopRequested) { KillTree(process); return AttemptOutcome.Abort; }
+                        continue; // 加载期跳过，进入下一轮才正式检测
                     }
                     if (_stopRequested)
                     {
