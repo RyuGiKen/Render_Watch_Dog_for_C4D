@@ -102,8 +102,8 @@ namespace RenderServerGui.Models
                 EndFrame = 100,
                 CooldownSeconds = 60,
                 FrameTimeoutSeconds = 600,
-                FrameCheckIntervalSeconds = 10,
-                MaxRetryPerFrame = 3,
+                FrameCheckIntervalSeconds = 60,
+                MaxRetryPerFrame = 4,
                 OnFail = OnFailBehaviour.Skip
             };
 

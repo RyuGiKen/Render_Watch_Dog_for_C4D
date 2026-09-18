@@ -7,18 +7,14 @@ using RenderServerGui.Models;
 namespace RenderServerGui.Services
 {
     /// <summary>
-    /// 单帧逐帧调度控制器，供 Cinema 4D 与 Commandline 两种模式共用（差异只在 ModeProfile 里的 exe 路径与异常记录路径）。
-    /// 流程：展开帧模板判"文件存在且非空"→跳过；否则启动 exe -render "工程" -frame 帧号→轮询
-    ///   · 进程退出：产物非空即成功，否则异常（含 _BugReport 基线变化=崩溃）
-    ///   · 进程仍在但超过单帧超时：若产物已生成→判"渲完未退出"→杀进程树算成功；否则判挂起→杀进程树重试
-    /// 异常后用 taskkill 杀整棵进程树，重试；达最大重试按策略跳过/停止；成功后帧间冷却→下一帧。
-    /// 注：无窗口进程（Commandline.exe）Responding 恒 false，仅在进程确有主窗口时才用 Responding 判活。
+    /// 单帧逐帧调度控制器，Cinema 4D 与 Commandline 严格共用同一套逻辑，仅进程/异常记录路径不同。
+    /// 时间参数：轮询间隔、杀进程后释放等待、重试前缓冲都用同一个「检查间隔」值；帧间冷却与单帧超时各自独立。
+    /// 崩溃报告沿用 Team Render 看门狗逻辑：在时间窗内被更新即计一次异常，连续累计达上限才杀进程，停止更新则清零（不逐帧另立基线）。
+    /// 无响应/挂起统一交给「单帧超时」闸门；无窗口进程（Commandline.exe）不检测 Responding。
     /// </summary>
     public class FrameRenderController : IRenderController
     {
         private enum FrameResult { Success, Abnormal, Aborted }
-
-        private const int KillSettleSeconds = 15;   // 杀进程后等待，令 GPU 驱动/文件句柄充分释放
 
         private Thread _worker;
         private volatile bool _stopRequested;
@@ -109,9 +105,9 @@ namespace RenderServerGui.Services
                             break;
                         }
 
-                        LogWarn($"帧 {frame} 第 {attempt}/{_p.MaxRetryPerFrame} 次重试。");
+                        LogWarn($"帧 {frame} 第 {attempt}/{_p.MaxRetryPerFrame} 次重试，等待 {_p.FrameCheckIntervalSeconds}s。");
                         RaiseProgress(completed, total, frame, $"重试中({attempt})");
-                        if (!SleepCancellable(Math.Min(_p.CooldownSeconds, 15))) break;
+                        if (!SleepCancellable(_p.FrameCheckIntervalSeconds)) break;
                     }
 
                     if (_stopRequested) break;
@@ -163,7 +159,7 @@ namespace RenderServerGui.Services
                 }
                 catch { }
 
-                DateTime baseline = ReadReportWriteTime(); // 崩溃基线，避免旧报告误判
+                var crashWindow = TimeSpan.FromSeconds(_p.FrameCheckIntervalSeconds * (_p.MaxRetryPerFrame + 1.5)); // 与 Team Render 同款判定时窗
                 process = Process.Start(psi);
                 LogInfo($"启动渲染 帧 {frame}（第 {attempt + 1} 次）PID {process.Id}  参数: {psi.Arguments}");
 
@@ -187,7 +183,7 @@ namespace RenderServerGui.Services
                             return FrameResult.Success;
                         }
                         int code = SafeExitCode(process);
-                        string why = ReportChangedAfter(baseline) ? "且检测到崩溃报告更新" : "但产物缺失/为空";
+                        string why = ProcessHealth.IsBugReportRecent(_p.ReportPath, crashWindow) ? "且崩溃报告在时窗内更新" : "但产物缺失/为空";
                         LogWarn($"帧 {frame} 进程已退出（码 {code}），{why}，判为失败并重试。");
                         return FrameResult.Abnormal; // 闪退/报错：进程已终结，直接算一次失败
                     }
@@ -225,11 +221,11 @@ namespace RenderServerGui.Services
                         loggedNoResp = false;
                     }
 
-                    // 崩溃报告更新：去抖计数，连续达最大重试次数才杀；停止更新则清零。日志显示进度。
-                    if (ReportChangedAfter(baseline))
+                    // 崩溃报告：沿用 Team Render 时窗判定，命中即计数，达上限才杀；停止命中则清零
+                    if (ProcessHealth.IsBugReportRecent(_p.ReportPath, crashWindow))
                     {
                         crashStreak++;
-                        LogWarn($"帧 {frame} 检测到崩溃报告更新，连续异常 {crashStreak}/{_p.MaxRetryPerFrame}。");
+                        LogWarn($"帧 {frame} 崩溃报告在时窗内，连续异常 {crashStreak}/{_p.MaxRetryPerFrame}。");
                         if (crashStreak >= _p.MaxRetryPerFrame)
                         {
                             LogWarn($"帧 {frame} 连续 {crashStreak} 次异常达上限，判定崩溃，杀进程重试。");
@@ -240,7 +236,7 @@ namespace RenderServerGui.Services
                     else if (crashStreak > 0)
                     {
                         crashStreak = 0;
-                        LogInfo($"帧 {frame} 崩溃报告停止更新，异常计数清零。");
+                        LogInfo($"帧 {frame} 崩溃报告已不在时窗内，异常计数清零。");
                     }
 
                     if (!SleepCancellable(_p.FrameCheckIntervalSeconds))
@@ -282,7 +278,7 @@ namespace RenderServerGui.Services
             try { if (proc != null && !proc.HasExited) { proc.Kill(); proc.WaitForExit(5000); } } catch { }
             if (pid > 0) RunTaskKill($"/F /T /PID {pid}"); // 补杀 taskkill 之后才拉起的子进程
 
-            SleepCancellable(KillSettleSeconds);
+            SleepCancellable(_p.FrameCheckIntervalSeconds);   // 杀后释放等待，与检查间隔同值
         }
 
         private void RunTaskKill(string arguments)
@@ -307,27 +303,6 @@ namespace RenderServerGui.Services
         }
 
         // ---------- 辅助 ----------
-
-        private DateTime ReadReportWriteTime()
-        {
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(_p.ReportPath) && File.Exists(_p.ReportPath))
-                    return File.GetLastWriteTimeUtc(_p.ReportPath);
-            }
-            catch { }
-            return DateTime.MinValue;
-        }
-
-        private bool ReportChangedAfter(DateTime baseline)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(_p.ReportPath) || !File.Exists(_p.ReportPath)) return false;
-                return File.GetLastWriteTimeUtc(_p.ReportPath) > baseline;
-            }
-            catch { return false; }
-        }
 
         private static int SafeExitCode(Process p)
         {
