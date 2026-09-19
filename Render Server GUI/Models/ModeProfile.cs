@@ -66,11 +66,14 @@ namespace RenderServerGui.Models
         /// <summary>帧间冷却（秒），避免过热。</summary>
         public int CooldownSeconds { get; set; }
 
-        /// <summary>单帧最长渲染时间（秒），超过即判挂起并重启本帧。</summary>
+        /// <summary>无进展超时（秒）：连续这么久没有"新帧落定"即判挂起杀进程重试（分块后不再按每帧总时长）。</summary>
         public int FrameTimeoutSeconds { get; set; }
 
         /// <summary>单帧模式轮询检查间隔（秒）。</summary>
         public int FrameCheckIntervalSeconds { get; set; }
+
+        /// <summary>最大分块长度：一个进程一次连渲的帧数上限。1=单帧；允许 ≥ 总帧数以一次渲完。执行时自动夹到任务范围。</summary>
+        public int MaxChunkLength { get; set; }
 
         /// <summary>内层监控：连续异常计数的上限，达到即判本次尝试失败（沿用 Team Render 去抖思路）。</summary>
         public int MaxAbnormalCount { get; set; }
@@ -106,6 +109,7 @@ namespace RenderServerGui.Models
                 CooldownSeconds = 60,
                 FrameTimeoutSeconds = 600,
                 FrameCheckIntervalSeconds = 30,
+                MaxChunkLength = 1,
                 MaxAbnormalCount = 5,
                 MaxFrameFailCount = 4,
                 OnFail = OnFailBehaviour.Skip

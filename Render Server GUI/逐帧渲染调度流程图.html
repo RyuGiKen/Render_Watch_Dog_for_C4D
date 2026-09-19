@@ -3,21 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>执行逻辑 · 带时间间隔的多分支树状图</title>
+<title>执行逻辑 · 带时间间隔的多分支树状图（分块版）</title>
 <style>
-  :root{
-    --bg:#f4f5f7;--ink:#24262b;--muted:#6b7280;--line:#d3d8df;
-    --now:#1d5fa8;--wait:#8a5a00;--kill:#a02b2b;--cool:#1f7a3f;--sig:#5b6472;
-  }
+  :root{--bg:#f4f5f7;--ink:#24262b;--muted:#6b7280;--line:#d3d8df;--now:#1d5fa8;--wait:#8a5a00;--kill:#a02b2b;--cool:#1f7a3f;--sig:#5b6472;}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.55;
-    font-family:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;font-size:13.5px;}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.55;font-family:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;font-size:13.5px;}
   header{padding:16px 22px 8px;}
   h1{font-size:19px;margin:0 0 4px;}
   .sub{color:var(--muted);font-size:12.5px;}
-  .wrap{padding:0 22px 40px;max-width:1180px;margin:0 auto;}
+  .wrap{padding:0 22px 40px;max-width:1200px;margin:0 auto;}
   h2{font-size:15px;margin:24px 0 4px;padding:6px 10px;border-radius:6px;color:#fff;}
-  h2.tr{background:#5b6472;} h2.c4d{background:#2e6f5e;}
+  h2.tr{background:#5b6472;} h2.c4d{background:#2e6f5e;} h2.dv{background:#5b6472;}
   .diff{font-size:12.5px;color:var(--muted);margin:2px 0 10px;}
   .params{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px;}
   .params span{background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;}
@@ -45,21 +41,21 @@
 </head>
 <body>
 <header>
-  <h1>执行逻辑 · 带时间间隔的多分支树状图</h1>
-  <div class="sub">每条连线标明「立即」或「等 Ns」。Cinema 4D 与 Commandline <b>共用同一段代码</b>（合成一张图），分<b>外层(帧)/内层(单进程)</b>两层；异常按类型分开。数值取 GUI 默认，均可改。</div>
+  <h1>执行逻辑 · 带时间间隔的多分支树状图（分块版）</h1>
+  <div class="sub">Cinema 4D 与 Commandline <b>共用同一段代码</b>。单帧是分块的特例（<b>最大分块长度 N=1</b>）；N≥1 且夹到任务范围，允许 N≥总帧数一次渲完。<b>续渲纯手动</b>：跨重启不留痕，由用户自查缺帧后手填范围。数值取 GUI 默认，均可改。</div>
 </header>
 <div class="wrap">
   <div class="legend">
     <span><span class="edge e-now">立即</span>立即执行下一步</span>
     <span><span class="edge e-wait">等Ns</span>等待后执行</span>
-    <span><span class="edge e-cool">冷却Ns(空载)</span>无渲染时降温</span>
+    <span><span class="edge e-cool">冷却</span>块间降温(空载)</span>
     <span><span class="edge e-kill">杀进程树</span>taskkill /F /T</span>
     <span><span class="edge e-sig">判定/信号</span>检测节点</span>
   </div>
 
   <!-- ================= Team Render ================= -->
-  <h2 class="tr">① Team Render 看门狗（常驻启动/重启，无帧概念）</h2>
-  <div class="diff">异常三信号<b>共用同一挂起计数</b>；无产物概念。崩溃报告判定时窗 = 检查间隔 ×(最大挂起+1.5) = 60×5.5 = <b>330s</b>。</div>
+  <h2 class="tr">① Team Render 看门狗（常驻启动/重启，无帧/无产物概念）</h2>
+  <div class="diff">异常三信号<b>共用同一挂起计数</b>；崩溃报告判定时窗 = 检查间隔×(最大挂起+1.5) = 60×5.5 = <b>330s</b>。</div>
   <div class="params">
     <span>检查间隔 <b>60s</b></span><span>连续工作 <b>60min</b>→休息 <b>3min</b></span>
     <span>最大挂起 <b>4</b></span><span>崩溃时窗 <b>330s</b></span><span>杀后释放 <b>120s</b></span><span>启动缓冲 <b>60s</b></span>
@@ -78,80 +74,86 @@
         <div class="row"><span class="edge e-now">是</span><span class="node">清缓存→启动进程</span><span class="edge e-wait">等60s启动缓冲</span><span class="tag">→ 判定C</span></div>
         <div class="row"><span class="edge e-sig">否</span><span class="tag">→ 判定C</span></div>
       </div>
-      <div class="row"><span class="edge e-sig">判定C</span><span class="node dec">健康检测（三信号任一即异常，挂起计数+1）</span></div>
+      <div class="row"><span class="edge e-sig">判定C</span><span class="node dec">健康检测（无响应 / 端口5401断开 / 崩溃报告330s内 任一即异常，挂起计数+1）</span></div>
       <div class="branch">
-        <div class="row"><span class="edge e-sig">信号</span><span class="node sig">无响应?</span><span class="node sig">端口5401断开?</span><span class="node sig">崩溃报告330s时窗内?</span></div>
-        <div class="row"><span class="edge e-now">任一异常</span><span class="node">挂起计数 +1（X/4）</span></div>
-        <div class="branch">
-          <div class="row"><span class="edge e-sig">&lt;4</span><span class="edge e-wait">等60s</span><span class="loop">↩ 下一轮</span></div>
-          <div class="row"><span class="edge e-kill">=4</span><span class="node kill">杀进程树</span><span class="edge e-wait">等120s</span><span class="node">清缓存启动</span><span class="edge e-wait">等60s</span><span class="node">计数清零</span><span class="edge e-wait">等60s</span><span class="loop">↩ 下一轮</span></div>
-        </div>
+        <div class="row"><span class="edge e-sig">&lt;4</span><span class="node">本轮不杀</span><span class="edge e-wait">等60s</span><span class="loop">↩ 下一轮</span></div>
+        <div class="row"><span class="edge e-kill">=4</span><span class="node kill">杀进程树</span><span class="edge e-wait">等120s</span><span class="node">清缓存启动</span><span class="edge e-wait">等60s</span><span class="node">计数清零</span><span class="edge e-wait">等60s</span><span class="loop">↩ 下一轮</span></div>
         <div class="row"><span class="edge e-now">全部正常</span><span class="node ok">计数清零</span><span class="edge e-wait">等60s</span><span class="loop">↩ 下一轮</span></div>
       </div>
     </div>
   </div>
 
-  <!-- ================= ②③ 共用，两层 ================= -->
-  <h2 class="c4d">②③ Cinema 4D.exe ／ Commandline.exe（共用同一段代码，分外层/内层）</h2>
-  <div class="diff">同一段代码，只是 exe 与崩溃路径不同。<b>唯一信号差别：Commandline 无窗口 → 不检测「无响应」</b>。异常四类各占一支：<b>无响应 / 报错(崩溃报告) / 闪退 / 挂起(超时)</b>。</div>
+  <!-- ================= ②③ 分块，两层 ================= -->
+  <h2 class="c4d">②③ Cinema 4D.exe ／ Commandline.exe（共用代码 · 分块 · 外层/内层）</h2>
+  <div class="diff">同一段代码，只是 exe 与崩溃路径不同。<b>唯一信号差别：Commandline 无窗口 → 不检测「无响应」</b>。块 <code>[a,b]</code> = 从游标起连续 <code>N</code> 帧（夹到末帧）；N=1 即单帧。挂起判活＝<b>600s 内无新帧落定</b>（不再用"每帧总时长"）。</div>
   <div class="params">
-    <span>检查间隔(内层轮询) <b>30s</b></span><span>帧间冷却(空载) <b>60s</b></span><span>单帧超时 <b>600s</b></span>
-    <span>最大异常次数 <b>5</b></span><span>帧最大失败次数 <b>4</b></span><span>崩溃时窗 <b>30×6.5=195s</b></span><span>产物落定需 距写入 ≥<b>60s</b></span>
+    <span>最大分块长度 N <b>1</b>(≥1，夹到范围)</span><span>检查间隔 <b>30s</b></span><span>启动前空载冷却 <b>60s</b></span><span>启动后加载宽限 <b>60s</b></span>
+    <span>无进展判挂起 <b>600s</b></span><span>最大异常次数 <b>5</b></span><span>帧最大失败次数 <b>4</b></span><span>崩溃时窗 <b>30×6.5=195s</b></span>
   </div>
 
   <div class="tree">
-    <div class="row"><span class="node layer">【外层 · 逐帧】</span></div>
-    <div class="row"><span class="node dec">取当前帧 f（起→止）</span></div>
+    <div class="row"><span class="node layer">【外层 · 逐块推进】</span> <span class="tag">游标只前进；跨重启不留痕</span></div>
+    <div class="row"><span class="node dec">cursor = 起始帧（重开时由用户填缺帧范围）</span></div>
     <div class="branch">
-      <div class="row"><span class="edge e-sig">续渲判定</span><span class="node dec">产物已落定（存在·非空·距写入≥60s）？</span></div>
+      <div class="row"><span class="edge e-sig">跳过已落定</span><span class="node">cursor 越过连续"已落定"帧（续渲/重叠）</span></div>
+      <div class="row"><span class="edge e-sig">取块</span><span class="node">a = cursor；b = min(a+N-1, 末帧)；块 [a,b]（N=1 即 [a,a]）</span></div>
+      <div class="row"><span class="edge e-cool">块前空载冷却60s</span><span class="node">启动进程 <code>-render "scene" -frame a b 1</code>（N=1 时 <code>-frame a</code>）</span><span class="edge e-sig">→</span><span class="node kill">进入【内层】观察</span></div>
+      <div class="row"><span class="edge e-sig">内层返回</span><span class="node dec">结果？</span></div>
       <div class="branch">
-        <div class="row"><span class="edge e-now">是</span><span class="node ok">记「跳过」完成+1</span><span class="edge e-now">立即(不冷却)</span><span class="loop">↩ 下一帧</span></div>
-        <div class="row"><span class="edge e-now">否</span><span class="node">帧失败计数 = 0</span></div>
+        <div class="row"><span class="edge e-now">成功(块全落定)</span><span class="node ok">推进计数</span> → <span class="node">cursor = b+1</span><span class="loop">↩ 下一块</span></div>
+        <div class="row"><span class="edge e-now">本块尝试失败</span><span class="node">newFirst = 块内第一个未落定帧 → newFirst &gt; a ？</span></div>
         <div class="branch">
-          <div class="row"><span class="node layer">尝试循环（同帧）</span></div>
+          <div class="row"><span class="edge e-sig">是(前进了)</span><span class="node">cursor = newFirst，focusFail=0</span><span class="loop">↩ 从 newFirst 重取块</span></div>
+          <div class="row"><span class="edge e-sig">否(原地卡起点)</span><span class="node">focusFail +1 →</span></div>
           <div class="branch">
-            <div class="row"><span class="edge e-now">立即</span><span class="node">启动进程 <code>exe -render "工程.c4d" -frame f</code></span><span class="edge e-sig">→</span><span class="node kill">进入【内层】观察（首轮先等冷却60s跳过加载，不检测）</span></div>
-            <div class="row"><span class="edge e-sig">内层返回</span><span class="node dec">结果？</span></div>
-            <div class="branch">
-              <div class="row"><span class="edge e-now">成功</span><span class="node ok">完成+1</span><span class="edge e-now">↩ 下一帧</span></div>
-              <div class="row"><span class="edge e-now">尝试失败</span><span class="node">帧失败 +1 → 已达 4？</span></div>
-              <div class="branch">
-                <div class="row"><span class="edge e-sig">&lt;4</span><span class="loop">↩ 回尝试循环，重启同帧（内层首轮再等冷却跳过加载）</span></div>
-                <div class="row"><span class="edge e-sig">=4</span><span class="node bad">默认「跳过该帧」(可切「停止」)</span><span class="edge e-now">↩ 下一帧</span></div>
-              </div>
-              <div class="row"><span class="edge e-now">启动错误 / 停止</span><span class="node bad">终止整场调度</span></div>
-            </div>
+            <div class="row"><span class="edge e-sig">&lt;帧最大失败4</span><span class="edge e-cool">冷却</span><span class="loop">↩ 重试同一起点 a</span></div>
+            <div class="row"><span class="edge e-sig">=4</span><span class="node bad">跳过起点帧：cursor=a+1，focusFail=0</span><span class="loop">↩ 下一块</span></div>
           </div>
         </div>
+        <div class="row"><span class="edge e-now">停止 / 进程起不来</span><span class="node bad">终止整场</span></div>
+        <div class="row"><span class="edge e-sig">熔断</span><span class="node bad">连续 ~3 块都"原地卡起点即失败" → 判资产/授权/未烘缓存类全局问题，停止并高亮（防整片被跳）</span></div>
       </div>
+      <div class="row"><span class="edge e-now">cursor&gt;末帧</span><span class="node ok">结束 · 汇总（缺帧由用户下次手填范围续渲）</span></div>
     </div>
 
-    <div class="row" style="margin-top:14px;"><span class="node layer">【内层 · 启动进程后】</span> 异常计数=0；<b>首轮先等冷却 60s 跳过加载期（不检测）</b>，之后每 <b>30s</b> 轮询，自上而下先命中先处理：</div>
+    <div class="row" style="margin-top:14px;"><span class="node layer">【内层 · 一个进程的观察】</span> 异常计数=0、记录已落定进度；<b>启动后先等冷却 60s 跳过加载(不检测)</b>，之后每 <b>30s</b> 轮询：</div>
     <div class="branch">
-      <div class="row"><span class="edge e-wait">等待(首轮60s/之后30s)</span><span class="node sig">① 收到停止 → <span class="k-bad">杀进程树</span> → 返回「停止」；(首轮仅等待，不进入下列检测)</span></div>
-      <div class="row"><span class="edge e-sig">② 产物已落定？</span><span class="node">是 → 若进程还在则<span class="k-warn">杀</span>「渲完未退出」，否则正常完成 → <span class="k-ok">返回「成功」</span></span></div>
-      <div class="row"><span class="edge e-sig">③ 进程已退出？(闪退)</span></div>
-      <div class="branch">
-        <div class="row"><span class="edge e-now">有产物(未落定)</span><span class="node">还在写 → 挂起等待，<b>不计异常</b> → 等下一 tick</span></div>
-        <div class="row"><span class="edge e-now">无产物(闪退/崩溃)</span><span class="node bad">异常计数 +1</span></div>
-      </div>
-      <div class="row"><span class="edge e-sig">④ 崩溃报告在195s时窗内？(报错)</span><span class="node bad">是 → 异常计数 +1</span></div>
-      <div class="row"><span class="edge e-sig">⑤ 无响应 且 已超时？(挂起)</span><span class="node bad">是 → 异常计数 +1</span></div>
-      <div class="row"><span class="edge e-sig">⑥ 仅无响应(未超时)</span><span class="node"><b>仅Cinema4D可观测，Commandline恒跳过</b>；只提示一次，异常计数<span class="k-ok">清零</span> → 等下一tick</span></div>
-      <div class="row"><span class="edge e-sig">⑦ 已超时(仍响应)无产物</span><span class="node bad">异常计数 +1</span></div>
-      <div class="row"><span class="edge e-now">⑧ 以上都不成立(正常渲染)</span><span class="node ok">异常计数清零 → 等下一tick</span></div>
-      <div class="row"><span class="edge e-sig">⑨ 异常计数 ≥ 5？</span><span class="node kill">是 → 杀进程树 → 返回「尝试失败」</span><span class="tag">否 → 回②下一 tick</span></div>
+      <div class="row"><span class="edge e-wait">等待(首轮60s/之后30s)</span><span class="node sig">① 收到停止 → <span class="k-bad">杀进程树</span> → 返回「停止」；(首轮仅等待不检测)</span></div>
+      <div class="row"><span class="edge e-sig">② 块内全部落定？</span><span class="node">是 → 若进程还在则<span class="k-warn">杀</span>「渲完未退出」，否则正常退出 → <span class="k-ok">返回「成功」</span></span></div>
+      <div class="row"><span class="edge e-sig">③ 有新帧落定？</span><span class="node">是 → 重置「无进展计时」，视为有进展</span></div>
+      <div class="row"><span class="edge e-sig">④ 崩溃报告在195s时窗内 或 进程已退出但块未全落定 或 600s无新帧落定？</span><span class="node bad">是 → 异常计数 +1（X/5）；<b>=5 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b></span></div>
+      <div class="row"><span class="edge e-sig">⑤ 已退出且块内已有部分落定</span><span class="node">立即 <span class="k-warn">返回「尝试失败」</span>（外层前进到缺口续渲，不空等去抖）</span></div>
+      <div class="row"><span class="edge e-sig">⑥ 仅无响应(未无进展超时)</span><span class="node"><b>仅Cinema4D可观测，Commandline恒跳过</b>；只提示一次，异常计数<span class="k-ok">清零</span> → 等下一tick</span></div>
+      <div class="row"><span class="edge e-now">⑦ 以上都不成立(正常推进)</span><span class="node ok">异常计数保持/清零 → 等下一tick</span></div>
+    </div>
+    <div class="row"><span class="tag">"落定"= 产物存在·非空·距最后写入≥60s；空/半截文件不算落定，崩在帧7会留下→下块起点自动落到7。</span></div>
+  </div>
+
+  <!-- 预览说明 -->
+  <h2 class="dv">预览按钮（单帧面板）</h2>
+  <div class="tree">
+    <div class="row">按命名规则（<code>*</code>→等长<code>?</code>通配）匹配，用正则从占位位置解析<b>帧号</b>；多通道带前后缀因整名不匹配、解析不出帧号 → 不计入。数量 X = <b>识别出的帧号个数</b>；把帧号合并成连续段、落在 <code>*</code> 位显示：</div>
+    <div class="branch">
+      <div class="row">全连续：<code>Image_[0,100].png 等101个文件</code></div>
+      <div class="row">缺 60：<code>Image_[0,59].png，Image_[61,100].png 等100个文件</code></div>
+      <div class="row">孤立单帧段：<code>Image_[7].png</code>（start==end 不写 7,7）</div>
     </div>
   </div>
 
-  <h2 style="background:#5b6472;">两类模式关键差异 + 分层职责</h2>
+  <!-- 日志裁剪 -->
+  <h2 class="dv">日志上限（防长跑占内存）</h2>
   <div class="tree" style="font-size:13px;">
-    <div class="row">• <b>分层：</b>内层只管"这一个进程启动后"的观察（含启动后冷却宽限），返回 成功/尝试失败/停止；<b>帧失败计数、重启、跳过、下一帧归外层</b>。</div>
-    <div class="row">• <b>无响应：</b>单帧模式不据此杀（高负载常态），只走⑥清零；<b>挂起统一由单帧超时 600s 收口</b>（⑤/⑦）。Team Render 则把无响应计入共享挂起计数。</div>
-    <div class="row">• <b>报错(崩溃报告)：</b>两模式都用"时窗命中即 +1、达上限才杀、出窗清零"的去抖；单帧上限=最大异常次数 5、Team Render 上限=最大挂起 4。</div>
-    <div class="row">• <b>闪退/正常退出：</b>先判产物——已落定即成功；有产物未落定则等待不误判；无产物才计异常（保留去抖，重启后内层首轮再等冷却跳过加载，避免连锁误判）。</div>
-    <div class="row">• <b>Cinema 4D vs Commandline：</b>同一段代码，唯一差别是 Commandline 无窗口 → ⑥无响应支自动跳过。</div>
-    <div class="row">• <b>时间值：</b>轮询=检查间隔(30s)；帧间冷却(60s)=启动后首轮的加载宽限(此间不检测)，同时用作产物"落定"所需的距最后写入最小秒数；单帧超时(600s)独立。</div>
+    <div class="row">• 累计超过 1500 行 或 15 万字符时，裁掉最旧部分、保留末尾约 1000 行；只影响显示，不影响判定。</div>
+  </div>
+
+  <h2 class="dv">关键要点</h2>
+  <div class="tree" style="font-size:13px;">
+    <div class="row">• <b>统一模型：</b>N=1 退化为单帧（块=[a,a]），单帧/分块同一套代码。</div>
+    <div class="row">• <b>挂起：</b>由"每帧总超时"改为<b>600s 无新帧落定</b>；块多长都不误杀，块内卡死也能及时抓。无响应仍只提示、不杀（Commandline 无窗口自动跳过）。</div>
+    <div class="row">• <b>报错(崩溃报告)：</b>195s 时窗命中即+1、达最大异常次数(5)才杀、出窗清零——与①同款去抖。</div>
+    <div class="row">• <b>推进/跳过：</b>前进就重置焦点失败计数；原地卡满帧最大失败(4)才跳起点帧，游标只前进不留内部洞；跨重启不留痕、用户手填范围。连续3块原地即失败→熔断停止。</div>
+    <div class="row">• <b>冷却：</b>每块启动前空载冷却(无渲染)；块内 N 帧连渲无冷却，N 越大越省加载也越积热。</div>
+    <div class="row">• <b>范围夹取：</b>所有帧号/块端点自动夹进 [起始帧, 结束帧]，N 允许 ≥ 总帧数一次渲完。</div>
   </div>
 </div>
 </body>

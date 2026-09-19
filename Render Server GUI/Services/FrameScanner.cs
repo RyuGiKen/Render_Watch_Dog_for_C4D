@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -80,6 +81,65 @@ namespace RenderServerGui.Services
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 按命名模板解析目录里"符合同一命名规则"的文件帧号，返回去重升序列表。
+        /// 占位星号段转成捕获组 (\\d+)，对每个文件"整名"匹配；带前后缀的多通道文件整名不匹配→忽略。
+        /// 模板无占位符或目录不存在时返回空。
+        /// </summary>
+        public static List<int> EnumerateRenderedFrames(string template)
+        {
+            var result = new List<int>();
+            if (string.IsNullOrEmpty(template) || !TokenRegex.IsMatch(template))
+                return result;
+
+            string dir = Path.GetDirectoryName(template);
+            string filePattern = Path.GetFileName(template);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                return result;
+
+            // 把占位段转成 (\d+)，其余字符正则转义，拼成"整文件名"匹配的正则
+            var sb = new System.Text.StringBuilder("^");
+            int i = 0;
+            while (i < filePattern.Length)
+            {
+                var m = TokenRegex.Match(filePattern, i);
+                if (m.Success && m.Index == i)
+                {
+                    sb.Append(@"(\d+)");
+                    i += m.Length;
+                }
+                else
+                {
+                    int next = m.Success ? m.Index : filePattern.Length;
+                    sb.Append(Regex.Escape(filePattern.Substring(i, next - i)));
+                    i = next;
+                }
+            }
+            sb.Append('$');
+
+            Regex re;
+            try { re = new Regex(sb.ToString(), RegexOptions.Compiled | RegexOptions.IgnoreCase); }
+            catch { return result; }
+
+            var set = new HashSet<int>();
+            try
+            {
+                foreach (string f in Directory.EnumerateFiles(dir))
+                {
+                    var mm = re.Match(Path.GetFileName(f));
+                    if (!mm.Success) continue;
+                    int frame;
+                    if (int.TryParse(mm.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out frame))
+                        set.Add(frame);
+                }
+            }
+            catch { return result; }
+
+            result.AddRange(set);
+            result.Sort();
+            return result;
         }
     }
 }

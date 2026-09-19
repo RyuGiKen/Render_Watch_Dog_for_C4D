@@ -46,6 +46,7 @@ namespace RenderServerGui.UI
             SetRange(numFrInterval, 1, 86400);
             SetRange(numFrRetry, 1, 999);
             SetRange(numFrFail, 1, 999);
+            SetRange(numMaxChunk, 1, 1000000);
         }
 
         private static void SetRange(NumericUpDown num, int min, int max)
@@ -141,6 +142,7 @@ namespace RenderServerGui.UI
                 numFrInterval.Value = Clamp(p.FrameCheckIntervalSeconds, numFrInterval);
                 numFrRetry.Value = Clamp(p.MaxAbnormalCount, numFrRetry);
                 numFrFail.Value = Clamp(p.MaxFrameFailCount, numFrFail);
+                numMaxChunk.Value = Clamp(p.MaxChunkLength, numMaxChunk);
                 cmbFrOnFail.SelectedIndex = p.OnFail == OnFailBehaviour.Stop ? 0 : 1;
             }
             else
@@ -185,6 +187,7 @@ namespace RenderServerGui.UI
                 p.FrameCheckIntervalSeconds = (int)numFrInterval.Value;
                 p.MaxAbnormalCount = (int)numFrRetry.Value;
                 p.MaxFrameFailCount = (int)numFrFail.Value;
+                p.MaxChunkLength = (int)numMaxChunk.Value;
                 p.OnFail = cmbFrOnFail.SelectedIndex == 1 ? OnFailBehaviour.Skip : OnFailBehaviour.Stop;
             }
             else
@@ -302,6 +305,30 @@ namespace RenderServerGui.UI
             rtbLog.AppendText($"[{entry.Time:HH:mm:ss}] {entry.Message}\n");
             rtbLog.SelectionColor = Color.Black;
             rtbLog.ScrollToCaret();
+            TrimLog();
+        }
+
+        // 日志上限：超过行数或字符数就裁掉最旧的一部分，避免长跑占用过多内存。
+        private const int MaxLogLines = 1500;
+        private const int MaxLogChars = 150000;
+        private const int LogTrimKeep = 1000;
+
+        private void TrimLog()
+        {
+            if (rtbLog.Lines.Length <= MaxLogLines && rtbLog.TextLength <= MaxLogChars) return;
+
+            // 保留末尾 LogTrimKeep 行：定位要删除的截断点（第 lines-keep 行的行首）
+            int lines = rtbLog.Lines.Length;
+            int keep = Math.Min(LogTrimKeep, lines / 2);
+            int drop = lines - keep;
+            if (drop <= 0) return;
+
+            int cutIndex = rtbLog.GetFirstCharIndexFromLine(drop);
+            if (cutIndex <= 0) return;
+
+            rtbLog.Select(0, cutIndex);
+            rtbLog.SelectedText = string.Empty;
+            rtbLog.Select(rtbLog.TextLength, 0);
         }
 
         private void ApplyStatus(RunnerStatus status)
@@ -379,23 +406,24 @@ namespace RenderServerGui.UI
             }
             else
             {
-                // 只按文本命名规则判断：占位星号转成等长的单字符通配 ?，看目录里有无同规则文件
-                string pattern = Path.GetFileName(FrameScanner.ToGlob(p.OutputTemplate));
-                string[] matched = SafeGetFiles(dir, pattern);
-
-                sb.AppendLine($"按命名规则 {pattern} 匹配到 {matched.Length} 个文件");
-                foreach (var f in matched.Take(5))
-                    sb.AppendLine("  " + Path.GetFileName(f));
-                if (matched.Length > 5)
-                    sb.AppendLine($"  …等共 {matched.Length} 个");
-                sb.AppendLine();
-
-                if (matched.Length > 0)
-                    sb.AppendLine("✓ 目录里存在同一命名规则的文件，模板可用。");
-                else if (CountFiles(dir) > 0)
-                    sb.AppendLine("⚠ 目录里有文件，但没有匹配该命名规则的：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照示例文件名修正模板。");
+                sb.AppendLine($"输出目录：{dir}");
+                var frames = FrameScanner.EnumerateRenderedFrames(p.OutputTemplate);
+                if (frames.Count == 0)
+                {
+                    sb.AppendLine(CountFiles(dir) > 0
+                        ? "⚠ 目录里有文件，但没有匹配命名规则的帧号：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照修正模板。"
+                        : "（输出目录为空——全新任务属正常）");
+                }
                 else
-                    sb.AppendLine("（输出目录为空——全新任务属正常）");
+                {
+                    string fileName = Path.GetFileName(p.OutputTemplate);
+                    string segs = BuildFrameRanges(Path.GetFileName(string.IsNullOrWhiteSpace(fileName) ? p.OutputTemplate : fileName), frames);
+                    sb.AppendLine();
+                    sb.AppendLine($"识别到{segs} 等 {frames.Count} 个文件");
+                    //int expect = p.EndFrame - p.StartFrame + 1;
+                    //if (p.StartFrame >= 0 && p.EndFrame >= p.StartFrame && frames.Count < expect)
+                    //    sb.AppendLine($"（任务范围 [{p.StartFrame},{p.EndFrame}] 应有 {expect} 帧，当前识别 {frames.Count} 帧）");
+                }
             }
 
             MessageBox.Show(this, sb.ToString(), "输出文件预览 / 校验", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -477,6 +505,23 @@ namespace RenderServerGui.UI
         {
             try { return Directory.GetFiles(dir).Length; }
             catch { return 0; }
+        }
+
+        /// <summary>把升序帧号合并成连续段，替换模板占位符显示，如 Image_[0,59].png，Image_[61,100].png。</summary>
+        private static string BuildFrameRanges(string template, List<int> sortedFrames)
+        {
+            var parts = new List<string>();
+            int runStart = sortedFrames[0], runPrev = sortedFrames[0];
+            for (int i = 1; i <= sortedFrames.Count; i++)
+            {
+                bool continues = i < sortedFrames.Count && sortedFrames[i] == runPrev + 1;
+                if (continues) { runPrev = sortedFrames[i]; continue; }
+
+                string rep = runStart == runPrev ? $"[{runStart}]" : $"[{runStart},{runPrev}]";
+                parts.Add(new System.Text.RegularExpressions.Regex(@"\*+").Replace(template, rep, 1)); // 只替换首个占位段
+                if (i < sortedFrames.Count) { runStart = sortedFrames[i]; runPrev = sortedFrames[i]; }
+            }
+            return string.Join("，", parts);
         }
 
         private void TryFill(TextBox target, OpenFileDialog dlg, string initialDir)

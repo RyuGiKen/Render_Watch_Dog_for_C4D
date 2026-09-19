@@ -62,6 +62,8 @@ namespace RenderServerGui.UI
             this.txtFrScene = new System.Windows.Forms.TextBox();
             this.btnFrScene = new System.Windows.Forms.Button();
             this.btnFrPreview = new System.Windows.Forms.Button();
+            this.lblMaxChunk = new System.Windows.Forms.Label();
+            this.numMaxChunk = new System.Windows.Forms.NumericUpDown();
             this.lblFrProc = new System.Windows.Forms.Label();
             this.txtFrProc = new System.Windows.Forms.TextBox();
             this.lblFrReport = new System.Windows.Forms.Label();
@@ -108,6 +110,7 @@ namespace RenderServerGui.UI
             ((System.ComponentModel.ISupportInitialize)(this.numFrInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrRetry)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrFail)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numMaxChunk)).BeginInit();
             this.panelLog.SuspendLayout();
             this.SuspendLayout();
 
@@ -180,7 +183,7 @@ namespace RenderServerGui.UI
             this.panelParams.Controls.Add(this.grpFrame);
             this.panelParams.Location = new System.Drawing.Point(0, 56);
             this.panelParams.Name = "panelParams";
-            this.panelParams.Size = new System.Drawing.Size(484, 478);
+            this.panelParams.Size = new System.Drawing.Size(484, 486);
 
             // grpTeamRender
             this.grpTeamRender.Controls.Add(this.lblTrExe);
@@ -251,6 +254,8 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.lblFrScene);
             this.grpFrame.Controls.Add(this.txtFrScene);
             this.grpFrame.Controls.Add(this.btnFrScene);
+            this.grpFrame.Controls.Add(this.lblMaxChunk);
+            this.grpFrame.Controls.Add(this.numMaxChunk);
             this.grpFrame.Controls.Add(this.btnFrPreview);
             this.grpFrame.Controls.Add(this.lblFrProc);
             this.grpFrame.Controls.Add(this.txtFrProc);
@@ -278,7 +283,7 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.cmbFrOnFail);
             this.grpFrame.Location = new System.Drawing.Point(8, 6);
             this.grpFrame.Name = "grpFrame";
-            this.grpFrame.Size = new System.Drawing.Size(470, 470);
+            this.grpFrame.Size = new System.Drawing.Size(470, 478);
             this.grpFrame.Text = "单帧调度参数";
             this.grpFrame.Visible = false;
 
@@ -307,28 +312,31 @@ namespace RenderServerGui.UI
             this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(240, 192); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "–";
             this.numFrEnd.Location = new System.Drawing.Point(256, 188); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
 
-            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 224); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
-            this.numFrCooldown.Location = new System.Drawing.Point(150, 220); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(100, 23);
+            this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 224); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
+            this.numMaxChunk.Location = new System.Drawing.Point(150, 220); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 256); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "单帧超时(秒)";
-            this.numFrTimeout.Location = new System.Drawing.Point(150, 252); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(100, 23);
+            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 256); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
+            this.numFrCooldown.Location = new System.Drawing.Point(150, 252); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(14, 288); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
-            this.numFrInterval.Location = new System.Drawing.Point(150, 284); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(100, 23);
+            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 288); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "无进展超时(秒)";
+            this.numFrTimeout.Location = new System.Drawing.Point(150, 284); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 320); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大异常次数";
-            this.numFrRetry.Location = new System.Drawing.Point(150, 316); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(100, 23);
+            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(14, 320); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
+            this.numFrInterval.Location = new System.Drawing.Point(150, 316); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrFail.AutoSize = true; this.lblFrFail.Location = new System.Drawing.Point(14, 352); this.lblFrFail.Name = "lblFrFail"; this.lblFrFail.Text = "帧最大失败次数";
-            this.numFrFail.Location = new System.Drawing.Point(150, 348); this.numFrFail.Name = "numFrFail"; this.numFrFail.Size = new System.Drawing.Size(100, 23);
+            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 352); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大异常次数";
+            this.numFrRetry.Location = new System.Drawing.Point(150, 348); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(100, 23);
 
-            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 384); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
+            this.lblFrFail.AutoSize = true; this.lblFrFail.Location = new System.Drawing.Point(14, 384); this.lblFrFail.Name = "lblFrFail"; this.lblFrFail.Text = "帧最大失败次数";
+            this.numFrFail.Location = new System.Drawing.Point(150, 380); this.numFrFail.Name = "numFrFail"; this.numFrFail.Size = new System.Drawing.Size(100, 23);
+
+            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 416); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
             this.cmbFrOnFail.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbFrOnFail.FormattingEnabled = true;
             this.cmbFrOnFail.Items.AddRange(new object[] { "停止并告警", "跳过继续" });
-            this.cmbFrOnFail.Location = new System.Drawing.Point(150, 380); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(150, 25);
+            this.cmbFrOnFail.Location = new System.Drawing.Point(150, 412); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(150, 25);
 
-            this.btnFrPreview.Location = new System.Drawing.Point(150, 412); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(300, 26);
+            this.btnFrPreview.Location = new System.Drawing.Point(150, 444); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(300, 26);
             this.btnFrPreview.Text = "预览输出文件名并校验目录"; this.btnFrPreview.UseVisualStyleBackColor = true;
 
             // panelLog
@@ -337,7 +345,7 @@ namespace RenderServerGui.UI
             this.panelLog.Controls.Add(this.rtbLog);
             this.panelLog.Location = new System.Drawing.Point(488, 56);
             this.panelLog.Name = "panelLog";
-            this.panelLog.Size = new System.Drawing.Size(452, 478);
+            this.panelLog.Size = new System.Drawing.Size(452, 486);
 
             this.lblLogTitle.AutoSize = true;
             this.lblLogTitle.Location = new System.Drawing.Point(12, 8);
@@ -356,13 +364,13 @@ namespace RenderServerGui.UI
             this.rtbLog.Name = "rtbLog";
             this.rtbLog.ReadOnly = true;
             this.rtbLog.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.rtbLog.Size = new System.Drawing.Size(432, 440);
+            this.rtbLog.Size = new System.Drawing.Size(432, 448);
             this.rtbLog.WordWrap = true;
 
             // MainForm
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(940, 540);
+            this.ClientSize = new System.Drawing.Size(940, 548);
             this.Controls.Add(this.panelTop);
             this.Controls.Add(this.panelParams);
             this.Controls.Add(this.panelLog);
@@ -392,6 +400,7 @@ namespace RenderServerGui.UI
             ((System.ComponentModel.ISupportInitialize)(this.numFrInterval)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrRetry)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrFail)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numMaxChunk)).EndInit();
             this.panelLog.ResumeLayout(false);
             this.panelLog.PerformLayout();
             this.ResumeLayout(false);
@@ -463,6 +472,8 @@ namespace RenderServerGui.UI
         private System.Windows.Forms.NumericUpDown numFrRetry;
         private System.Windows.Forms.Label lblFrFail;
         private System.Windows.Forms.NumericUpDown numFrFail;
+        private System.Windows.Forms.Label lblMaxChunk;
+        private System.Windows.Forms.NumericUpDown numMaxChunk;
         private System.Windows.Forms.Label lblFrOnFail;
         private System.Windows.Forms.ComboBox cmbFrOnFail;
 
