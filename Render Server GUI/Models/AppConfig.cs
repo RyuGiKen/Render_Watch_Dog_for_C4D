@@ -14,6 +14,9 @@ namespace RenderServerGui.Models
         /// <summary>当前选中的模式（启动时恢复）。</summary>
         public RenderMode Mode { get; set; }
 
+        /// <summary>界面语言码（如 zh-CN / zh-HK / en-US），默认简体中文。</summary>
+        public string Language { get; set; } = "zh-CN";
+
         /// <summary>Team Render 模式参数。</summary>
         public ModeProfile TeamRender { get; set; }
 
@@ -87,6 +90,7 @@ namespace RenderServerGui.Models
                     cfg.TeamRender = cfg.TeamRender ?? ModeProfile.ForPreset(RenderMode.TeamRender);
                     cfg.Cinema4D = cfg.Cinema4D ?? ModeProfile.ForPreset(RenderMode.Cinema4D);
                     cfg.Commandline = cfg.Commandline ?? ModeProfile.ForPreset(RenderMode.Commandline);
+                    if (string.IsNullOrWhiteSpace(cfg.Language)) cfg.Language = "zh-CN";
                     return cfg;
                 }
             }

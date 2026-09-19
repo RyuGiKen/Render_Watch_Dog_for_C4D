@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using RenderServerGui.Services;
 
 namespace RenderServerGui
 {
@@ -15,6 +17,9 @@ namespace RenderServerGui
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += OnThreadException;
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+
+            // 加载多语言表（exe 目录下 i18n/*.txt）；具体语言在 MainForm 读取配置后设定
+            Localizer.Load(Path.Combine(AppContext.BaseDirectory, "i18n"));
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

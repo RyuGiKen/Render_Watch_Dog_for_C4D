@@ -86,9 +86,11 @@ namespace RenderServerGui.Services
             RaiseStatus(RunnerStatus.Running);
 
             int total = Math.Max(0, _p.EndFrame - _p.StartFrame + 1);
-            LogInfo($"分块渲染启动：{_p.ExePath}  -render \"{_p.SceneFile}\"");
-            LogInfo($"帧范围 {_p.StartFrame}–{_p.EndFrame}（共 {total} 帧），模板 {_p.OutputTemplate}，最大分块 {_p.MaxChunkLength}");
-            LogInfo($"检查间隔 {_p.FrameCheckIntervalSeconds}s，无进展超时 {_p.FrameTimeoutSeconds}s，帧间冷却 {_p.CooldownSeconds}s，最大异常 {_p.MaxAbnormalCount}，帧最大失败 {_p.MaxFrameFailCount}，失败{(_p.OnFail == OnFailBehaviour.Skip ? "跳过" : "停止")}");
+            LogInfo(Localizer.Tf("log.fr.startCmd", "分块渲染启动：{0}  -render \"{1}\"", _p.ExePath, _p.SceneFile));
+            LogInfo(Localizer.Tf("log.fr.range", "帧范围 {0}–{1}（共 {2} 帧），模板 {3}，最大分块 {4}", _p.StartFrame, _p.EndFrame, total, _p.OutputTemplate, _p.MaxChunkLength));
+            LogInfo(Localizer.Tf("log.fr.params", "检查间隔 {0}s，无进展超时 {1}s，帧间冷却 {2}s，最大异常 {3}，帧最大失败 {4}，失败{5}",
+                _p.FrameCheckIntervalSeconds, _p.FrameTimeoutSeconds, _p.CooldownSeconds, _p.MaxAbnormalCount, _p.MaxFrameFailCount,
+                _p.OnFail == OnFailBehaviour.Skip ? Localizer.T("log.fr.failSkip", "跳过") : Localizer.T("log.fr.failStop", "停止")));
 
             _worker = new Thread(WorkerLoop) { IsBackground = true, Name = "FrameRenderController" };
             _worker.Start();
@@ -100,7 +102,7 @@ namespace RenderServerGui.Services
             if (!IsRunning) return;
             _stopRequested = true;
             RaiseStatus(RunnerStatus.Stopping);
-            LogInfo("正在停止…（将结束当前渲染进程）");
+            LogInfo(Localizer.T("log.fr.stopping", "正在停止…（将结束当前渲染进程）"));
         }
 
         // ================= 外层：游标 + 分块推进 =================
@@ -112,7 +114,7 @@ namespace RenderServerGui.Services
             int total = end - start + 1;
             if (total <= 0)
             {
-                LogError("结束帧小于起始帧，无帧可渲染。");
+                LogError(Localizer.T("log.fr.noFrames", "结束帧小于起始帧，无帧可渲染。"));
                 Finish(RunnerStatus.Error);
                 return;
             }
@@ -120,7 +122,7 @@ namespace RenderServerGui.Services
             // 首次启动前：若已有同名渲染进程在跑，弹窗让用户决定“停止队列”或“杀残留再启动”
             if (!HandlePreexisting())
             {
-                LogWarn("用户选择停止，未启动渲染。");
+                LogWarn(Localizer.T("log.fr.userStop", "用户选择停止，未启动渲染。"));
                 Finish(RunnerStatus.Stopped);
                 return;
             }
@@ -182,16 +184,16 @@ namespace RenderServerGui.Services
                         {
                             if (_p.OnFail == OnFailBehaviour.Stop)
                             {
-                                LogWarn($"帧 {fa} 连续 {focusFail} 次尝试无进展，按策略停止调度。");
+                                LogWarn(Localizer.Tf("log.fr.frameStop", "帧 {0} 连续 {1} 次尝试无进展，按策略停止调度。", fa, focusFail));
                                 cursor = end + 1; // 退出外层 while
                                 break;
                             }
                             consecStall++;
-                            LogWarn($"帧 {fa} 连续 {focusFail} 次尝试无进展，跳过该帧。");
+                            LogWarn(Localizer.Tf("log.fr.frameSkip", "帧 {0} 连续 {1} 次尝试无进展，跳过该帧。", fa, focusFail));
                             cursor = fa + 1;
                             break;
                         }
-                        LogWarn($"帧 {fa} 第 {focusFail}/{_p.MaxFrameFailCount} 次尝试无进展，冷却后重启本块。");
+                        LogWarn(Localizer.Tf("log.fr.frameRetry", "帧 {0} 第 {1}/{2} 次尝试无进展，重启本块。", fa, focusFail, _p.MaxFrameFailCount));
                     }
 
                     accounted = Clamp(cursor - start, 0, total);
@@ -200,7 +202,7 @@ namespace RenderServerGui.Services
                     if (_stopRequested) break;
                     if (consecStall >= CircuitBreakerBlocks)
                     {
-                        LogError($"连续 {consecStall} 块都在起点即失败、毫无进展，疑似资产缺失/未烘缓存/授权等全局问题，停止调度。");
+                        LogError(Localizer.Tf("log.fr.circuitBreak", "连续 {0} 块都在起点即失败、毫无进展，疑似资产缺失/未烘缓存/授权等全局问题，停止调度。", consecStall));
                         final = RunnerStatus.Error;
                         break;
                     }
@@ -208,12 +210,12 @@ namespace RenderServerGui.Services
             }
             catch (Exception ex)
             {
-                LogError($"调度异常终止: {ex.Message}");
+                LogError(Localizer.Tf("log.fr.exception", "调度异常终止: {0}", ex.Message));
                 final = RunnerStatus.Error;
             }
 
             if (final != RunnerStatus.Error)
-                LogInfo($"调度结束：已推进 {Clamp(cursor - start, 0, total)}/{total} 帧（缺帧可重开工具填范围续渲）。");
+                LogInfo(Localizer.Tf("log.fr.summaryDone", "调度结束：已推进 {0}/{1} 帧（缺帧可重开工具填范围续渲）。", Clamp(cursor - start, 0, total), total));
             Finish(final);
         }
 
@@ -240,7 +242,7 @@ namespace RenderServerGui.Services
                 catch { }
 
                 process = Process.Start(psi);
-                LogInfo($"启动渲染 块[{a},{b}] PID {process.Id}  参数: {psi.Arguments}");
+                LogInfo(Localizer.Tf("log.fr.blockStart", "启动渲染 块[{0},{1}] PID {2}  参数: {3}", a, b, process.Id, psi.Arguments));
 
                 var startT = DateTime.Now;
                 var crashWindow = TimeSpan.FromSeconds(_p.FrameCheckIntervalSeconds * (_p.MaxAbnormalCount + 1.5)); // 与 Team Render 同款时窗
@@ -262,11 +264,11 @@ namespace RenderServerGui.Services
                         bool alive = !SafeExited(process);
                         if (alive)
                         {
-                            LogInfo($"块[{a},{b}] 全部落定但进程未退出，结束进程并计成功。");
+                            LogInfo(Localizer.Tf("log.fr.doneKilled", "块[{0},{1}] 全部落定但进程未退出，结束进程并计成功。", a, b));
                             KillTree(process);
                             return BlockOutcome.SuccessKilled;
                         }
-                        LogInfo($"块[{a},{b}] 渲染完成（退出码 {SafeExitCode(process)}）。");
+                        LogInfo(Localizer.Tf("log.fr.doneExit", "块[{0},{1}] 渲染完成（退出码 {2}）。", a, b, SafeExitCode(process)));
                         return BlockOutcome.SuccessExited;
                     }
 
@@ -286,34 +288,34 @@ namespace RenderServerGui.Services
                     // 已退出且已有部分落定：终态且能续，立即判尝试失败（让外层前进到缺口）
                     if (exited && settled > 0 && !allSettled)
                     {
-                        LogWarn($"块[{a},{b}] 进程退出、已完成 {settled}/{blockLen} 帧，判本次尝试失败，外层从缺口续渲。");
+                        LogWarn(Localizer.Tf("log.fr.exitedPartial", "块[{0},{1}] 进程退出、已完成 {2}/{3} 帧，判本次尝试失败，外层从缺口续渲。", a, b, settled, blockLen));
                         return BlockOutcome.FailedProgress;
                     }
 
                     string badReason = null;
-                    if (exited && settled == 0) badReason = "已退出无产物(秒退)";
-                    else if (crash) badReason = "崩溃报告在时窗内";
-                    else if (noProgress) badReason = $"{_p.FrameTimeoutSeconds}s 无新帧落定";
+                    if (exited && settled == 0) badReason = Localizer.T("log.fr.reasonSnappy", "已退出无产物(秒退)");
+                    else if (crash) badReason = Localizer.T("log.fr.reasonCrash", "崩溃报告在时窗内");
+                    else if (noProgress) badReason = Localizer.Tf("log.fr.reasonNoProgress", "{0}s 无新帧落定", _p.FrameTimeoutSeconds);
 
                     if (badReason != null)
                     {
                         abnormal++;
-                        LogWarn($"块[{a},{b}] {badReason}，异常计数 {abnormal}/{_p.MaxAbnormalCount}。");
+                        LogWarn(Localizer.Tf("log.fr.abnCount", "块[{0},{1}] {2}，异常计数 {3}/{4}。", a, b, badReason, abnormal, _p.MaxAbnormalCount));
                         if (abnormal >= _p.MaxAbnormalCount)
                         {
-                            LogWarn($"块[{a},{b}] 连续异常达 {_p.MaxAbnormalCount} 次，结束进程，判本次尝试失败。");
+                            LogWarn(Localizer.Tf("log.fr.abnMax", "块[{0},{1}] 连续异常达 {2} 次，结束进程，判本次尝试失败。", a, b, _p.MaxAbnormalCount));
                             KillTree(process);
                             return BlockOutcome.FailedAbnormal;
                         }
                     }
                     else
                     {
-                        if (abnormal > 0) { abnormal = 0; LogInfo($"块[{a},{b}] 恢复正常，异常计数清零。"); }
+                        if (abnormal > 0) { abnormal = 0; LogInfo(Localizer.Tf("log.fr.recovered", "块[{0},{1}] 恢复正常，异常计数清零。", a, b)); }
                         if (unresponsive)
                         {
                             if (!loggedNoResp)
                             {
-                                LogInfo($"块[{a},{b}] 当前无响应（高负载常态），不单独处理，持续至无进展超时再判（本块已运行 {(DateTime.Now - startT).TotalSeconds:F0}s）。");
+                                LogInfo(Localizer.Tf("log.fr.noRespInfo", "块[{0},{1}] 当前无响应（高负载常态），不单独处理，持续至无进展超时再判（本块已运行 {2}s）。", a, b, (DateTime.Now - startT).TotalSeconds.ToString("F0")));
                                 loggedNoResp = true;
                             }
                         }
@@ -325,7 +327,7 @@ namespace RenderServerGui.Services
             }
             catch (Exception ex)
             {
-                LogError($"启动/监控 块[{a},{b}] 出错: {ex.Message}");
+                LogError(Localizer.Tf("log.fr.launchErr", "启动/监控 块[{0},{1}] 出错: {2}", a, b, ex.Message));
                 try { if (process != null && !process.HasExited) KillTree(process); } catch { }
                 return BlockOutcome.Abort; // 起不来视为终止（多为配置/路径问题），停止整场
             }
@@ -397,19 +399,19 @@ namespace RenderServerGui.Services
 
             if (choice == PreexistingChoice.Abort)
             {
-                LogWarn($"检测到 {count} 个 {(_p.ProcessName)} 进程在运行；按选择停止调度，未启动、也不动这些进程。");
+                LogWarn(Localizer.Tf("log.fr.preexistStop", "检测到 {0} 个 {1} 进程在运行；按选择停止调度，未启动、也不动这些进程。", count, _p.ProcessName));
                 foreach (var p in leftovers) { try { p.Dispose(); } catch { } }
                 return false;
             }
 
-            LogWarn($"检测到 {count} 个残留 {(_p.ProcessName)} 进程，正在结束…");
+            LogWarn(Localizer.Tf("log.fr.preexistKill", "检测到 {0} 个残留 {1} 进程，正在结束…", count, _p.ProcessName));
             foreach (var p in leftovers)
             {
                 try { KillTree(p); }
                 finally { try { p.Dispose(); } catch { } }
             }
             SleepIdle(PreexistingKillSeconds); // 稍候确保句柄释放
-            LogInfo("残留进程已清理，开始渲染。");
+            LogInfo(Localizer.T("log.fr.preexistCleared", "残留进程已清理，开始渲染。"));
             return true;
         }
 
@@ -426,7 +428,7 @@ namespace RenderServerGui.Services
                 };
                 using (var pr = Process.Start(psi)) { pr?.WaitForExit(8000); }
             }
-            catch (Exception ex) { LogWarn($"taskkill 执行失败({arguments}): {ex.Message}"); }
+            catch (Exception ex) { LogWarn(Localizer.Tf("log.taskkillFail", "taskkill 执行失败({0}): {1}", arguments, ex.Message)); }
         }
 
         /// <summary>安全读取进程是否已退出（异常按已退出处理）。</summary>
@@ -460,7 +462,7 @@ namespace RenderServerGui.Services
         {
             IsRunning = false;
             RaiseStatus(status);
-            LogInfo(status == RunnerStatus.Error ? "调度已因错误停止。" : "调度已停止。");
+            LogInfo(status == RunnerStatus.Error ? Localizer.T("log.fr.errStop", "调度已因错误停止。") : Localizer.T("log.fr.stopped", "调度已停止。"));
         }
 
         /// <summary>抛出一帧进度更新。</summary>

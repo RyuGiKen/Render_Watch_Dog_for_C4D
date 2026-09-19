@@ -11,7 +11,7 @@ namespace RenderServerGui.Services
     /// Team Render 客户端看门狗控制器：忠实移植自 Team Render Watch Dog 的主循环，
     /// 仅把硬编码常量改为从 ModeProfile 读取，并把阻塞式 Thread.Sleep 换成可中断休眠以便停止。
     /// 逻辑保持完全一致：找进程 / 过热休息 / 三重异常判定(Responding+端口+BugReport) /
-    /// 挂起计数达上限杀进程重启 / 启动前清缓存。
+    /// 挂起计数达上限杀进程重启 / 启动前清缓存。日志文案经 Localizer 本地化（缺配置回退中文）。
     /// </summary>
     public class TeamRenderController : IRenderController
     {
@@ -52,13 +52,13 @@ namespace RenderServerGui.Services
             IsRunning = true;
             RaiseStatus(RunnerStatus.Running);
 
-            LogInfo($"开始监控进程: {_p.ProcessName}");
-            LogInfo($"端口号: {_p.Port}");
-            LogInfo($"目标路径: {_p.ExePath}");
-            LogInfo($"异常路径: {_p.ReportPath}");
-            LogInfo($"检查间隔: {_p.CheckIntervalSeconds}秒");
-            LogInfo($"连续挂起{_p.MaxHangCount}次后将终止进程");
-            LogInfo($"连续运行{_p.WorkingMinutes}分钟后将休息{_p.RestMinutes}分钟");
+            LogInfo(Localizer.Tf("log.tr.monitor", "开始监控进程: {0}", _p.ProcessName));
+            LogInfo(Localizer.Tf("log.tr.port", "端口号: {0}", _p.Port));
+            LogInfo(Localizer.Tf("log.tr.target", "目标路径: {0}", _p.ExePath));
+            LogInfo(Localizer.Tf("log.tr.report", "异常路径: {0}", _p.ReportPath));
+            LogInfo(Localizer.Tf("log.tr.interval", "检查间隔: {0}秒", _p.CheckIntervalSeconds));
+            LogInfo(Localizer.Tf("log.tr.hangMax", "连续挂起{0}次后将终止进程", _p.MaxHangCount));
+            LogInfo(Localizer.Tf("log.tr.workRest", "连续运行{0}分钟后将休息{1}分钟", _p.WorkingMinutes, _p.RestMinutes));
 
             _worker = new Thread(WorkerLoop) { IsBackground = true, Name = "TeamRenderController" };
             _worker.Start();
@@ -70,7 +70,7 @@ namespace RenderServerGui.Services
             if (!IsRunning) return;
             _stopRequested = true;
             RaiseStatus(RunnerStatus.Stopping);
-            LogInfo("正在停止监控…");
+            LogInfo(Localizer.T("log.tr.stopping", "正在停止监控…"));
         }
 
         /// <summary>后台监控主循环：每检查间隔处理一轮（过热休息 / 缺失启动 / 健康判定）。</summary>
@@ -87,11 +87,11 @@ namespace RenderServerGui.Services
                         TimeSpan worked = DateTime.Now - _lastStartTime;
                         if (target != null && worked.TotalMinutes > _p.WorkingMinutes)
                         {
-                            LogInfo($"连续工作{worked:hh\\:mm\\:ss}，休息降温");
+                            LogInfo(Localizer.Tf("log.tr.resting", "连续工作{0}，休息降温", worked.ToString(@"hh\:mm\:ss")));
                             KillProcess(target, false);
                             target = null;
                             if (!SleepCancellable(_p.RestMinutes * 60.0)) break;
-                            LogInfo("休息结束");
+                            LogInfo(Localizer.T("log.tr.restEnd", "休息结束"));
                         }
 
                         if (target == null)
@@ -103,7 +103,7 @@ namespace RenderServerGui.Services
                     }
                     catch (Exception ex)
                     {
-                        LogError($"检查过程中发生错误: {ex.Message}");
+                        LogError(Localizer.Tf("log.tr.errCheck", "检查过程中发生错误: {0}", ex.Message));
                     }
 
                     if (!SleepCancellable(_p.CheckIntervalSeconds)) break;
@@ -113,7 +113,7 @@ namespace RenderServerGui.Services
             {
                 IsRunning = false;
                 RaiseStatus(RunnerStatus.Stopped);
-                LogInfo("监控已停止。");
+                LogInfo(Localizer.T("log.tr.ended", "监控已停止。"));
             }
         }
 
@@ -124,7 +124,7 @@ namespace RenderServerGui.Services
             if (target == null)
             {
                 _processHangCount = new Dictionary<int, int>();
-                LogInfo($"目标进程不存在，端口[{_p.Port}]：{(portUsing ? "占用" : "断开")}");
+                LogInfo(Localizer.Tf("log.tr.notFound", "目标进程不存在，端口[{0}]：{1}", _p.Port, PortWord(portUsing)));
                 return;
             }
 
@@ -138,8 +138,9 @@ namespace RenderServerGui.Services
                 if (!responding || !portUsing || newBugReport)
                 {
                     int hangCount = GetAndIncrementHangCount(target.Id);
-                    string tag = newBugReport ? "异常! " : "无响应! ";
-                    LogWarn($"进程{tag}PID: {target.Id} 端口[{_p.Port}]：{(portUsing ? "占用" : "断开")}，挂起次数: {hangCount}/{_p.MaxHangCount}");
+                    string tag = newBugReport ? Localizer.T("log.tagAbnormal", "异常! ") : Localizer.T("log.tagNoResp", "无响应! ");
+                    LogWarn(Localizer.Tf("log.tr.abnormal", "进程{0}PID: {1} 端口[{2}]：{3}，挂起次数: {4}/{5}",
+                        tag, target.Id, _p.Port, PortWord(portUsing), hangCount, _p.MaxHangCount));
 
                     if (hangCount >= _p.MaxHangCount)
                     {
@@ -152,12 +153,14 @@ namespace RenderServerGui.Services
                     if (_processHangCount.ContainsKey(target.Id))
                     {
                         _processHangCount.Remove(target.Id);
-                        LogInfo($"进程恢复正常，重置挂起计数. PID: {target.Id} 端口[{_p.Port}]：{(portUsing ? "占用" : "断开")}");
+                        LogInfo(Localizer.Tf("log.tr.recovered", "进程恢复正常，重置挂起计数. PID: {0} 端口[{1}]：{2}",
+                            target.Id, _p.Port, PortWord(portUsing)));
                     }
                     else
                     {
                         TimeSpan worked = DateTime.Now - _lastStartTime;
-                        LogInfo($"进程[{target.Id}]正常运行，端口[{_p.Port}]：{(portUsing ? "占用" : "断开")}，已工作{worked:hh\\:mm\\:ss}");
+                        LogInfo(Localizer.Tf("log.tr.normal", "进程[{0}]正常运行，端口[{1}]：{2}，已工作{3}",
+                            target.Id, _p.Port, PortWord(portUsing), worked.ToString(@"hh\:mm\:ss")));
                     }
                 }
             }
@@ -166,6 +169,10 @@ namespace RenderServerGui.Services
                 target.Dispose();
             }
         }
+
+        /// <summary>端口状态词（占用/断开），本地化。</summary>
+        private static string PortWord(bool used)
+            => used ? Localizer.T("net.used", "占用") : Localizer.T("net.free", "断开");
 
         /// <summary>按进程名查找目标客户端进程（与原程序一致，不校验完整路径），找不到返回 null。</summary>
         private Process FindTargetProcess()
@@ -195,18 +202,18 @@ namespace RenderServerGui.Services
                 try { pid = process.Id; } catch { }
                 try
                 {
-                    LogInfo($"正在终止进程树… PID: {pid}");
+                    LogInfo(Localizer.Tf("log.tr.killing", "正在终止进程树… PID: {0}", pid));
                     if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
                     try { if (!process.HasExited) { process.Kill(); } } catch { }
                     if (process.WaitForExit(5000))
-                        LogInfo($"进程已成功终止. PID: {pid}");
+                        LogInfo(Localizer.Tf("log.tr.killedOk", "进程已成功终止. PID: {0}", pid));
                     else
-                        LogWarn($"进程终止超时，但已发送终止信号. PID: {pid}");
+                        LogWarn(Localizer.Tf("log.tr.killTimeout", "进程终止超时，但已发送终止信号. PID: {0}", pid));
                     if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
                 }
                 catch (Exception ex)
                 {
-                    LogError($"终止进程失败: {ex.Message}");
+                    LogError(Localizer.Tf("log.tr.killErr", "终止进程失败: {0}", ex.Message));
                 }
 
                 SleepCancellable(_p.CheckIntervalSeconds * 2.0);
@@ -233,7 +240,7 @@ namespace RenderServerGui.Services
             }
             catch (Exception ex)
             {
-                LogWarn($"taskkill 执行失败({arguments}): {ex.Message}");
+                LogWarn(Localizer.Tf("log.taskkillFail", "taskkill 执行失败({0}): {1}", arguments, ex.Message));
             }
         }
 
@@ -248,11 +255,11 @@ namespace RenderServerGui.Services
             {
                 process = Process.Start(_p.ExePath);
                 _lastStartTime = DateTime.Now;
-                LogInfo($"启动进程成功. PID: {process.Id}");
+                LogInfo(Localizer.Tf("log.tr.startOk", "启动进程成功. PID: {0}", process.Id));
             }
             catch (Exception ex)
             {
-                LogError($"启动进程失败: {ex.Message}");
+                LogError(Localizer.Tf("log.tr.startErr", "启动进程失败: {0}", ex.Message));
             }
 
             SleepCancellable(_p.CheckIntervalSeconds);
@@ -270,18 +277,18 @@ namespace RenderServerGui.Services
                 foreach (string file in Directory.GetFiles(_p.CachePath))
                 {
                     try { File.Delete(file); }
-                    catch (Exception ex) { LogError($"删除文件失败: {file} - {ex.Message}"); }
+                    catch (Exception ex) { LogError(Localizer.Tf("log.tr.cacheFileFail", "删除文件失败: {0} - {1}", file, ex.Message)); }
                 }
                 foreach (string dir in Directory.GetDirectories(_p.CachePath))
                 {
                     try { Directory.Delete(dir, true); }
-                    catch (Exception ex) { LogError($"删除目录失败: {dir} - {ex.Message}"); }
+                    catch (Exception ex) { LogError(Localizer.Tf("log.tr.cacheDirFail", "删除目录失败: {0} - {1}", dir, ex.Message)); }
                 }
-                LogInfo("清空缓存完成");
+                LogInfo(Localizer.T("log.tr.cacheCleared", "清空缓存完成"));
             }
             catch (Exception ex)
             {
-                LogError($"清空缓存异常: {ex.Message}");
+                LogError(Localizer.Tf("log.tr.cacheErr", "清空缓存异常: {0}", ex.Message));
             }
         }
 

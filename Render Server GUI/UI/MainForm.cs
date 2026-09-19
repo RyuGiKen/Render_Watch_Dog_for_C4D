@@ -19,16 +19,30 @@ namespace RenderServerGui.UI
         private AppConfig _cfg;
         /// <summary>当前运行中的控制器实例。</summary>
         private IRenderController _controller;
-        /// <summary>UI 是否已就绪（就绪前忽略模式切换事件以免覆盖初值）。</summary>
+        /// <summary>UI 是否已就绪（就绪前忽略模式/语言切换事件以免覆盖初值）。</summary>
         private bool _uiReady;
+        /// <summary>语言下拉对应的语言码（与 Items 同序）。</summary>
+        private readonly System.Collections.Generic.List<string> _langCodes = new System.Collections.Generic.List<string>();
+        /// <summary>最近一次运行状态，切换语言时据此刷新状态文字。</summary>
+        private RunnerStatus _lastStatus = RunnerStatus.Stopped;
 
-        /// <summary>初始化窗体：设置数值范围、事件，并载入配置到界面。</summary>
+        /// <summary>初始化窗体：装配语言与数值范围、事件，载入配置并应用界面语言。</summary>
         public MainForm()
         {
             InitializeComponent();
             ConfigureNumericRanges();
+            BuildLanguageMenu();
             WireEvents();
             LoadConfigIntoUi();
+
+            // 应用持久化语言
+            int li = _langCodes.IndexOf(_cfg.Language);
+            if (li < 0) li = 0;
+            string code = _langCodes.Count > 0 ? _langCodes[li] : Localizer.DefaultLang;
+            Localizer.SetLanguage(code);
+            cmbLang.SelectedIndex = li;
+            ApplyLanguage();
+
             _uiReady = true;
         }
 
@@ -81,6 +95,7 @@ namespace RenderServerGui.UI
 
             numFrStart.ValueChanged += (s, e) => UpdateRangeCount();
             numFrEnd.ValueChanged += (s, e) => UpdateRangeCount();
+            cmbLang.SelectedIndexChanged += (s, e) => OnLanguageChanged();
 
             FormClosing += OnFormClosingHandler;
         }
@@ -90,7 +105,120 @@ namespace RenderServerGui.UI
         {
             long n = (long)numFrEnd.Value - (long)numFrStart.Value + 1;
             if (n < 0) n = 0;
-            lblRangeCount.Text = $"共 {n} 帧";
+            lblRangeCount.Text = Localizer.Tf("ui.count", "共 {0} 帧", n);
+        }
+
+        // ---------- 多语言 ----------
+
+        /// <summary>用扫描到的语言填充下拉（各语言显示其本名，不随界面语言变）。</summary>
+        private void BuildLanguageMenu()
+        {
+            _langCodes.Clear();
+            cmbLang.Items.Clear();
+            var langs = Localizer.Languages;
+            if (langs == null || langs.Count == 0)
+            {
+                _langCodes.Add(Localizer.DefaultLang);
+                cmbLang.Items.Add("简体中文");
+                return;
+            }
+            foreach (var kv in langs)
+            {
+                _langCodes.Add(kv.Key);
+                cmbLang.Items.Add(kv.Value);
+            }
+        }
+
+        /// <summary>语言下拉切换：应用并持久化所选语言。</summary>
+        private void OnLanguageChanged()
+        {
+            if (!_uiReady) return;
+            int i = cmbLang.SelectedIndex;
+            if (i < 0 || i >= _langCodes.Count) return;
+            string code = _langCodes[i];
+            Localizer.SetLanguage(code);
+            _cfg.Language = code;
+            _cfg.Save(out _);
+            ApplyLanguage();
+        }
+
+        /// <summary>把界面所有可见文字按当前语言重设；下拉项重填并保留选择。</summary>
+        private void ApplyLanguage()
+        {
+            Text = Localizer.T("ui.title", "Render Server GUI");
+            lblMode.Text = Localizer.T("ui.mode", "模式");
+            RebuildCombo(cmbMode, new[]
+            {
+                Localizer.T("ui.mode.team", "Team Render（看门狗）"),
+                Localizer.T("ui.mode.c4d", "Cinema 4D（单帧）"),
+                Localizer.T("ui.mode.cl", "Commandline（单帧）")
+            });
+            btnStart.Text = Localizer.T("ui.start", "启动");
+            btnStop.Text = Localizer.T("ui.stop", "停止");
+            lblLang.Text = Localizer.T("ui.lang", "语言");
+
+            // Team Render 分组
+            grpTeamRender.Text = Localizer.T("ui.trGroup", "Team Render 参数");
+            lblTrExe.Text = Localizer.T("ui.exe", "主程序路径");
+            lblTrProc.Text = Localizer.T("ui.proc", "进程名称");
+            lblTrReport.Text = Localizer.T("ui.report", "异常记录文件");
+            lblTrCache.Text = Localizer.T("ui.cache", "缓存目录");
+            lblTrPort.Text = Localizer.T("ui.port", "端口");
+            lblTrInterval.Text = Localizer.T("ui.checkInterval", "检查间隔(秒)");
+            lblTrHang.Text = Localizer.T("ui.maxHang", "最大挂起次数");
+            lblTrWork.Text = Localizer.T("ui.workMin", "连续工作(分)");
+            lblTrRest.Text = Localizer.T("ui.restMin", "休息时长(分)");
+            chkTrClearCache.Text = Localizer.T("ui.clearCache", "启动前清空缓存目录");
+
+            // 单帧分组
+            grpFrame.Text = Localizer.T("ui.frGroup", "单帧调度参数");
+            lblFrExe.Text = Localizer.T("ui.exe", "主程序路径");
+            lblFrProc.Text = Localizer.T("ui.proc", "进程名称");
+            lblFrReport.Text = Localizer.T("ui.report", "异常记录文件");
+            lblFrScene.Text = Localizer.T("ui.scene", "工程文件");
+            lblFrOutput.Text = Localizer.T("ui.output", "输出模板");
+            lblFrStart.Text = Localizer.T("ui.range", "帧范围(起~止)");
+            lblMaxChunk.Text = Localizer.T("ui.maxChunk", "最大分块长度");
+            lblFrCooldown.Text = Localizer.T("ui.cooldown", "帧间冷却(秒)");
+            lblFrTimeout.Text = Localizer.T("ui.noProgressTimeout", "无进展超时(秒)");
+            lblFrInterval.Text = Localizer.T("ui.checkInterval", "检查间隔(秒)");
+            lblFrRetry.Text = Localizer.T("ui.maxAbnormal", "最大异常次数");
+            lblFrFail.Text = Localizer.T("ui.maxFail", "帧最大失败次数");
+            lblFrOnFail.Text = Localizer.T("ui.onFail", "失败时");
+            RebuildCombo(cmbFrOnFail, new[]
+            {
+                Localizer.T("ui.onFailStop", "停止并告警"),
+                Localizer.T("ui.onFailSkip", "跳过继续")
+            });
+            btnFrPreview.Text = Localizer.T("ui.preview", "预览输出文件名并校验目录");
+            lblLogTitle.Text = Localizer.T("ui.logTitle", "运行日志");
+            btnClearLog.Text = Localizer.T("ui.clearLog", "清空日志");
+
+            SetStatusText();
+            UpdateRangeCount();
+        }
+
+        /// <summary>按当前语言与最近状态刷新状态文字。</summary>
+        private void SetStatusText()
+        {
+            switch (_lastStatus)
+            {
+                case RunnerStatus.Running: lblStatusText.Text = Localizer.T("ui.statusRunning", "运行中"); break;
+                case RunnerStatus.Stopping: lblStatusText.Text = Localizer.T("ui.statusStopping", "停止中"); break;
+                case RunnerStatus.Error: lblStatusText.Text = Localizer.T("ui.statusError", "异常"); break;
+                default: lblStatusText.Text = Localizer.T("ui.statusStopped", "已停止"); break;
+            }
+        }
+
+        /// <summary>用新文本重填下拉项并尽量保留当前选择索引。</summary>
+        private static void RebuildCombo(ComboBox cmb, string[] items)
+        {
+            int sel = cmb.SelectedIndex;
+            cmb.BeginUpdate();
+            cmb.Items.Clear();
+            foreach (var it in items) cmb.Items.Add(it);
+            if (sel >= 0 && sel < cmb.Items.Count) cmb.SelectedIndex = sel;
+            cmb.EndUpdate();
         }
 
         // ---------- 模式 <-> 索引 ----------
@@ -241,8 +369,8 @@ namespace RenderServerGui.UI
             ModeProfile p = _cfg.ProfileOf(_cfg.Mode);
             if (!ValidateProfile(p, out string err))
             {
-                AppendLog(new LogEntry(LogLevel.Error, "参数校验未通过：" + err));
-                MessageBox.Show(err, "无法启动", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AppendLog(new LogEntry(LogLevel.Error, Localizer.T("msg.badPrefix", "参数校验未通过：") + err));
+                MessageBox.Show(err, Localizer.T("msg.cantStartTitle", "无法启动"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -268,11 +396,11 @@ namespace RenderServerGui.UI
                 return (PreexistingChoice)Invoke(new Func<int, PreexistingChoice>(AskPreexisting), count);
 
             string name = _cfg.ProfileOf(_cfg.Mode)?.ProcessName ?? "渲染";
-            var r = MessageBox.Show(this,
-                $"检测到已有 {count} 个「{name}」进程在运行。\n\n" +
-                "选“是”＝结束这些残留进程后再开始队列；\n" +
-                "选“否”＝停止本次调度（不启动、也不动这些进程）。",
-                "已存在渲染进程", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            string body = Localizer.Tf("dlg.preexistBody",
+                "检测到已有 {0} 个「{1}」进程在运行。\n\n选“是”＝结束这些残留进程后再开始队列；\n选“否”＝停止本次调度（不启动、也不动这些进程）。",
+                count, name);
+            var r = MessageBox.Show(this, body,
+                Localizer.T("dlg.preexistTitle", "已存在渲染进程"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2);
             return r == DialogResult.Yes ? PreexistingChoice.KillAndStart : PreexistingChoice.Abort;
         }
@@ -290,17 +418,17 @@ namespace RenderServerGui.UI
         private bool ValidateProfile(ModeProfile p, out string error)
         {
             error = null;
-            if (p == null) { error = "未选择模式。"; return false; }
-            if (string.IsNullOrWhiteSpace(p.ExePath)) { error = "主程序路径为空。"; return false; }
-            if (string.IsNullOrWhiteSpace(p.ProcessName)) { error = "进程名称为空。"; return false; }
-            if (string.IsNullOrWhiteSpace(p.ReportPath)) { error = "异常记录文件路径为空。"; return false; }
+            if (p == null) { error = Localizer.T("msg.badNull", "未选择模式。"); return false; }
+            if (string.IsNullOrWhiteSpace(p.ExePath)) { error = Localizer.T("msg.badExe", "主程序路径为空。"); return false; }
+            if (string.IsNullOrWhiteSpace(p.ProcessName)) { error = Localizer.T("msg.badProc", "进程名称为空。"); return false; }
+            if (string.IsNullOrWhiteSpace(p.ReportPath)) { error = Localizer.T("msg.badReport", "异常记录文件路径为空。"); return false; }
 
             if (IsFrameMode(_cfg.Mode))
             {
-                if (string.IsNullOrWhiteSpace(p.SceneFile)) { error = "工程文件为空。"; return false; }
-                if (p.StartFrame > p.EndFrame) { error = "起始帧不能大于结束帧。"; return false; }
-                if (string.IsNullOrWhiteSpace(p.OutputTemplate)) { error = "输出模板为空。"; return false; }
-                if (!Regex_HasToken(p.OutputTemplate)) { error = "输出模板缺少帧号占位符，形如 Image_****.png（星号个数=补零位数）。"; return false; }
+                if (string.IsNullOrWhiteSpace(p.SceneFile)) { error = Localizer.T("msg.badScene", "工程文件为空。"); return false; }
+                if (p.StartFrame > p.EndFrame) { error = Localizer.T("msg.badRange", "起始帧不能大于结束帧。"); return false; }
+                if (string.IsNullOrWhiteSpace(p.OutputTemplate)) { error = Localizer.T("msg.templateEmpty", "输出模板为空。"); return false; }
+                if (!Regex_HasToken(p.OutputTemplate)) { error = Localizer.T("msg.templateNoToken", "输出模板缺少帧号占位符，应形如 Image_****.png（星号个数=补零位数）。"); return false; }
             }
             return true;
         }
@@ -385,27 +513,25 @@ namespace RenderServerGui.UI
         /// <summary>按运行状态更新状态灯颜色/文字并同步按钮可用性。</summary>
         private void ApplyStatus(RunnerStatus status)
         {
+            _lastStatus = status;
             switch (status)
             {
                 case RunnerStatus.Running:
                     lblStatusDot.BackColor = Color.ForestGreen;
-                    lblStatusText.Text = "运行中";
                     break;
                 case RunnerStatus.Stopping:
                     lblStatusDot.BackColor = Color.DarkOrange;
-                    lblStatusText.Text = "停止中";
                     break;
                 case RunnerStatus.Error:
                     lblStatusDot.BackColor = Color.Firebrick;
-                    lblStatusText.Text = "异常";
                     SetRunningUi(false);
                     break;
                 default:
                     lblStatusDot.BackColor = Color.Gray;
-                    lblStatusText.Text = "已停止";
                     SetRunningUi(false);
                     break;
             }
+            SetStatusText();
         }
 
         /// <summary>按进度信息更新进度条。</summary>
@@ -422,8 +548,8 @@ namespace RenderServerGui.UI
         {
             if (!IsFrameMode(_cfg.Mode))
             {
-                MessageBox.Show(this, "工程文件与输出模板用于单帧模式，请先切到 Cinema 4D 或 Commandline 模式。",
-                    "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, Localizer.T("msg.needFrameMode", "工程文件与输出模板用于单帧/分块模式，请先切到 Cinema 4D 或 Commandline 模式。"),
+                    Localizer.T("msg.previewTitleShort", "预览输出名"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -432,50 +558,50 @@ namespace RenderServerGui.UI
 
             if (string.IsNullOrWhiteSpace(p.OutputTemplate))
             {
-                MessageBox.Show(this, "输出模板为空。", "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, Localizer.T("msg.templateEmpty", "输出模板为空。"),
+                    Localizer.T("msg.previewTitleShort", "预览输出名"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             if (!Regex_HasToken(p.OutputTemplate))
             {
-                MessageBox.Show(this, "输出模板缺少帧号占位符，应形如 Image_****.png（星号个数=补零位数）。",
-                    "预览输出名", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, Localizer.T("msg.templateNoToken", "输出模板缺少帧号占位符，应形如 Image_****.png（星号个数=补零位数）。"),
+                    Localizer.T("msg.previewTitleShort", "预览输出名"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             string startPath = FrameScanner.FramePath(p.OutputTemplate, p.StartFrame);
             string endPath = FrameScanner.FramePath(p.OutputTemplate, p.EndFrame);
             var sb = new StringBuilder();
-            sb.AppendLine($"起始帧 {p.StartFrame} → {startPath}");
-            sb.AppendLine($"结束帧 {p.EndFrame} → {endPath}");
+            sb.AppendLine(Localizer.Tf("dlg.preStartFrame", "起始帧 {0} → {1}", p.StartFrame, startPath));
+            sb.AppendLine(Localizer.Tf("dlg.preEndFrame", "结束帧 {0} → {1}", p.EndFrame, endPath));
             sb.AppendLine();
 
             string dir = Path.GetDirectoryName(startPath);
             bool dirOk = !string.IsNullOrEmpty(dir) && Directory.Exists(dir);
             if (!dirOk)
             {
-                sb.AppendLine("输出目录尚不存在：");
+                sb.AppendLine(Localizer.T("dlg.preDirNotExist", "输出目录尚不存在："));
                 sb.AppendLine("  " + dir);
-                sb.AppendLine("（开始渲染时会自动创建，属正常情况）");
+                sb.AppendLine(Localizer.T("dlg.preWillCreate", "（开始渲染时会自动创建，属正常情况）"));
             }
             else
             {
-                sb.AppendLine($"输出目录：{dir}");
+                sb.AppendLine(Localizer.Tf("dlg.preDir", "输出目录：{0}", dir));
                 var frames = FrameScanner.EnumerateRenderedFrames(p.OutputTemplate);
                 if (frames.Count == 0)
                 {
                     sb.AppendLine(CountFiles(dir) > 0
-                        ? "⚠ 目录里有文件，但没有匹配命名规则的帧号：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照修正模板。"
-                        : "（输出目录为空——全新任务属正常）");
+                        ? Localizer.T("dlg.preNoMatchWarn", "⚠ 目录里有文件，但没有匹配命名规则的帧号：多半前缀/补零位数/扩展名与工程内实际输出名不一致，请对照修正模板。")
+                        : Localizer.T("dlg.preEmpty", "（输出目录为空——全新任务属正常）"));
                 }
                 else
                 {
-                    string fileName = Path.GetFileName(p.OutputTemplate);
-                    string segs = BuildFrameRanges(Path.GetFileName(string.IsNullOrWhiteSpace(fileName) ? p.OutputTemplate : fileName), frames);
-                    sb.AppendLine($"识别到{segs} 等 {frames.Count} 个文件");
+                    string segs = BuildFrameRanges(Path.GetFileName(p.OutputTemplate), frames);
+                    sb.AppendLine(Localizer.Tf("dlg.preCount", "{0} 等 {1} 个文件", segs, frames.Count));
                 }
             }
 
-            MessageBox.Show(this, sb.ToString(), "输出文件预览 / 校验", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, sb.ToString(), Localizer.T("dlg.previewTitle", "输出文件预览 / 校验"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // ---------- 浏览对话框 ----------
