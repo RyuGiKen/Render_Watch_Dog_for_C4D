@@ -15,24 +15,32 @@ namespace RenderServerGui.Services
     /// </summary>
     public class TeamRenderController : IRenderController
     {
+        /// <summary>后台监控线程。</summary>
         private Thread _worker;
+        /// <summary>停止请求标志，令所有可中断等待尽快返回。</summary>
         private volatile bool _stopRequested;
+        /// <summary>本次运行的模式参数快照。</summary>
         private ModeProfile _p;
 
-        // 与原程序一致的运行期状态
+        /// <summary>按进程 ID 记录连续挂起次数（与原看门狗一致）。</summary>
         private Dictionary<int, int> _processHangCount = new Dictionary<int, int>();
+        /// <summary>上次启动/重启客户端的时间，用于判定连续工作时长。</summary>
         private DateTime _lastStartTime = DateTime.Now;
 
+        /// <summary>控制器是否正在运行。</summary>
         public bool IsRunning { get; private set; }
 
+        /// <summary>产生一条日志时触发。</summary>
         public event EventHandler<LogEntry> Log;
+        /// <summary>运行状态变化时触发。</summary>
         public event EventHandler<RunnerStatus> StatusChanged;
 
-        // 看门狗无逐帧概念，此事件保留但不触发（故抑制 CS0067）。
+        /// <summary>进度事件（看门狗无逐帧概念，保留但不触发，故抑制 CS0067）。</summary>
 #pragma warning disable 0067
         public event EventHandler<FrameProgressInfo> FrameProgressChanged;
 #pragma warning restore 0067
 
+        /// <summary>启动监控：打印参数概览并拉起后台监控线程。</summary>
         public void Start(ModeProfile profile)
         {
             if (IsRunning) return;
@@ -56,6 +64,7 @@ namespace RenderServerGui.Services
             _worker.Start();
         }
 
+        /// <summary>请求停止监控。</summary>
         public void Stop()
         {
             if (!IsRunning) return;
@@ -64,6 +73,7 @@ namespace RenderServerGui.Services
             LogInfo("正在停止监控…");
         }
 
+        /// <summary>后台监控主循环：每检查间隔处理一轮（过热休息 / 缺失启动 / 健康判定）。</summary>
         private void WorkerLoop()
         {
             try
@@ -107,6 +117,7 @@ namespace RenderServerGui.Services
             }
         }
 
+        /// <summary>三重健康判定（Responding / 端口占用 / 崩溃报告），命中累加挂起计数、达上限杀并重启，恢复则清零。</summary>
         private void CheckAndMonitorProcess(Process target)
         {
             bool portUsing = ProcessHealth.IsPortUsed(_p.Port);
@@ -156,6 +167,7 @@ namespace RenderServerGui.Services
             }
         }
 
+        /// <summary>按进程名查找目标客户端进程（与原程序一致，不校验完整路径），找不到返回 null。</summary>
         private Process FindTargetProcess()
         {
             foreach (Process process in Process.GetProcessesByName(_p.ProcessName))
@@ -166,6 +178,7 @@ namespace RenderServerGui.Services
             return null;
         }
 
+        /// <summary>取并自增某进程的挂起计数，返回自增后的值。</summary>
         private int GetAndIncrementHangCount(int processId)
         {
             if (!_processHangCount.ContainsKey(processId))
@@ -173,6 +186,7 @@ namespace RenderServerGui.Services
             return ++_processHangCount[processId];
         }
 
+        /// <summary>杀目标进程树（taskkill /F /T + Kill 兜底），等待释放后按需重启客户端。</summary>
         private void KillProcess(Process process, bool restart)
         {
             if (process != null)
@@ -201,6 +215,7 @@ namespace RenderServerGui.Services
                 StartProcess();
         }
 
+        /// <summary>调用 taskkill 执行参数（.NET Framework 无进程树 Kill 的兜底手段）。</summary>
         private void RunTaskKill(string arguments)
         {
             try
@@ -222,6 +237,7 @@ namespace RenderServerGui.Services
             }
         }
 
+        /// <summary>按开关清缓存后启动客户端，记录启动时间并等待一段启动缓冲，返回进程（失败为 null）。</summary>
         private Process StartProcess()
         {
             if (_p.ClearCache)
@@ -243,6 +259,7 @@ namespace RenderServerGui.Services
             return process;
         }
 
+        /// <summary>清空缓存目录下的文件与子目录（保留目录本身），逐个删除并容错。</summary>
         private void ClearCache()
         {
             try
@@ -282,9 +299,13 @@ namespace RenderServerGui.Services
             return !_stopRequested;
         }
 
+        /// <summary>抛出一条 Info 日志。</summary>
         private void LogInfo(string m) => Log?.Invoke(this, new LogEntry(LogLevel.Info, m));
+        /// <summary>抛出一条 Warn 日志。</summary>
         private void LogWarn(string m) => Log?.Invoke(this, new LogEntry(LogLevel.Warn, m));
+        /// <summary>抛出一条 Error 日志。</summary>
         private void LogError(string m) => Log?.Invoke(this, new LogEntry(LogLevel.Error, m));
+        /// <summary>抛出运行状态变化事件。</summary>
         private void RaiseStatus(RunnerStatus s) => StatusChanged?.Invoke(this, s);
     }
 }

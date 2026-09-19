@@ -11,12 +11,16 @@ namespace RenderServerGui.Models
     [Serializable]
     public class AppConfig
     {
+        /// <summary>当前选中的模式（启动时恢复）。</summary>
         public RenderMode Mode { get; set; }
 
+        /// <summary>Team Render 模式参数。</summary>
         public ModeProfile TeamRender { get; set; }
 
+        /// <summary>Cinema 4D 模式参数。</summary>
         public ModeProfile Cinema4D { get; set; }
 
+        /// <summary>Commandline 模式参数。</summary>
         public ModeProfile Commandline { get; set; }
 
         /// <summary>settings.xml 的完整路径（exe 同目录）。</summary>

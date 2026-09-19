@@ -16,7 +16,7 @@ namespace RenderServerGui.Models
     }
 
     /// <summary>
-    /// 逐帧模式在达到最大重试后对失败帧的处理策略。
+    /// 逐帧/分块模式在单帧连续失败达到"帧最大失败次数"后的处理策略。
     /// </summary>
     public enum OnFailBehaviour
     {

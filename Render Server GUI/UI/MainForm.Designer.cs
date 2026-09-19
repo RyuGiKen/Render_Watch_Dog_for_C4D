@@ -76,6 +76,7 @@ namespace RenderServerGui.UI
             this.numFrStart = new System.Windows.Forms.NumericUpDown();
             this.lblFrEnd = new System.Windows.Forms.Label();
             this.numFrEnd = new System.Windows.Forms.NumericUpDown();
+            this.lblRangeCount = new System.Windows.Forms.Label();
             this.lblFrCooldown = new System.Windows.Forms.Label();
             this.numFrCooldown = new System.Windows.Forms.NumericUpDown();
             this.lblFrTimeout = new System.Windows.Forms.Label();
@@ -269,6 +270,7 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.numFrStart);
             this.grpFrame.Controls.Add(this.lblFrEnd);
             this.grpFrame.Controls.Add(this.numFrEnd);
+            this.grpFrame.Controls.Add(this.lblRangeCount);
             this.grpFrame.Controls.Add(this.lblFrCooldown);
             this.grpFrame.Controls.Add(this.numFrCooldown);
             this.grpFrame.Controls.Add(this.lblFrTimeout);
@@ -307,10 +309,11 @@ namespace RenderServerGui.UI
             this.txtFrOutput.Location = new System.Drawing.Point(150, 156); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(270, 23);
             this.btnFrOutput.Location = new System.Drawing.Point(426, 155); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
 
-            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 192); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起-止)";
+            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 192); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起~止)";
             this.numFrStart.Location = new System.Drawing.Point(150, 188); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
-            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(240, 192); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "–";
+            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(240, 192); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~";
             this.numFrEnd.Location = new System.Drawing.Point(256, 188); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
+            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = System.Drawing.Color.Gray; this.lblRangeCount.Location = new System.Drawing.Point(352, 192); this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧";
 
             this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 224); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
             this.numMaxChunk.Location = new System.Drawing.Point(150, 220); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(100, 23);
@@ -461,6 +464,7 @@ namespace RenderServerGui.UI
         private System.Windows.Forms.Label lblFrStart;
         private System.Windows.Forms.NumericUpDown numFrStart;
         private System.Windows.Forms.Label lblFrEnd;
+        private System.Windows.Forms.Label lblRangeCount;
         private System.Windows.Forms.NumericUpDown numFrEnd;
         private System.Windows.Forms.Label lblFrCooldown;
         private System.Windows.Forms.NumericUpDown numFrCooldown;

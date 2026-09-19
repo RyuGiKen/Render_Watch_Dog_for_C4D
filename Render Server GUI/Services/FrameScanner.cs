@@ -11,11 +11,11 @@ namespace RenderServerGui.Services
     /// 帧号占位符写作一段连续的星号（如 ****），星号个数即补零位数。
     /// 选星号是因为 Windows 文件名不允许出现 *，正常渲染产物不会与占位符冲突，避免误判。
     /// 例：D:\Output\Image_****.png + 帧 100 => D:\Output\Image_0100.png
-    /// 成品判定只做一件事：文件存在且非空（0 字节的半截文件不算完成）。
+    /// 成品判定分两档：IsFrameRendered=存在且非空（排除 0 字节）；IsFrameSettled 再要求距最后写入≥指定秒（排除仍在写入的半截文件）。
     /// </summary>
     public static class FrameScanner
     {
-        // 一段连续的 *
+        /// <summary>匹配模板中"一段连续的星号"帧号占位符。</summary>
         private static readonly Regex TokenRegex = new Regex(@"\*+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         /// <summary>把模板中每段连续的 * 替换为补零后的帧号（位数=星号个数）。无占位符则原样返回。</summary>

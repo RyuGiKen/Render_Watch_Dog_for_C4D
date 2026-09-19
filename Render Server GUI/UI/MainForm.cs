@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using RenderServerGui.Models;
@@ -16,10 +15,14 @@ namespace RenderServerGui.UI
     /// </summary>
     public partial class MainForm : Form
     {
+        /// <summary>内存中的整体配置（三模式参数 + 当前模式）。</summary>
         private AppConfig _cfg;
+        /// <summary>当前运行中的控制器实例。</summary>
         private IRenderController _controller;
+        /// <summary>UI 是否已就绪（就绪前忽略模式切换事件以免覆盖初值）。</summary>
         private bool _uiReady;
 
+        /// <summary>初始化窗体：设置数值范围、事件，并载入配置到界面。</summary>
         public MainForm()
         {
             InitializeComponent();
@@ -31,6 +34,7 @@ namespace RenderServerGui.UI
 
         // ---------- 初始化 ----------
 
+        /// <summary>设置各数字输入框的取值范围。</summary>
         private void ConfigureNumericRanges()
         {
             SetRange(numTrPort, 1, 65535);
@@ -49,6 +53,7 @@ namespace RenderServerGui.UI
             SetRange(numMaxChunk, 1, 1000000);
         }
 
+        /// <summary>设置单个 NumericUpDown 的最小/最大值，整数、无千分位。</summary>
         private static void SetRange(NumericUpDown num, int min, int max)
         {
             num.Minimum = min;
@@ -57,6 +62,7 @@ namespace RenderServerGui.UI
             num.ThousandsSeparator = false;
         }
 
+        /// <summary>集中订阅界面事件（模式切换、按钮、路径浏览、帧范围刷新、关闭）。</summary>
         private void WireEvents()
         {
             cmbMode.SelectedIndexChanged += (s, e) => OnModeChanged();
@@ -73,11 +79,23 @@ namespace RenderServerGui.UI
             btnFrOutput.Click += (s, e) => BrowseOutputFolder();
             btnFrPreview.Click += (s, e) => OnPreviewOutput();
 
+            numFrStart.ValueChanged += (s, e) => UpdateRangeCount();
+            numFrEnd.ValueChanged += (s, e) => UpdateRangeCount();
+
             FormClosing += OnFormClosingHandler;
+        }
+
+        /// <summary>刷新"帧范围"右侧的帧数量显示（只读，随起止帧自动更新；结束小于起始则显示 0）。</summary>
+        private void UpdateRangeCount()
+        {
+            long n = (long)numFrEnd.Value - (long)numFrStart.Value + 1;
+            if (n < 0) n = 0;
+            lblRangeCount.Text = $"共 {n} 帧";
         }
 
         // ---------- 模式 <-> 索引 ----------
 
+        /// <summary>模式 → 下拉框索引。</summary>
         private static int ModeToIndex(RenderMode mode)
         {
             switch (mode)
@@ -88,6 +106,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>下拉框索引 → 模式。</summary>
         private static RenderMode IndexToMode(int index)
         {
             switch (index)
@@ -98,11 +117,13 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>是否为单帧/分块模式（Cinema 4D 或 Commandline）。</summary>
         private static bool IsFrameMode(RenderMode mode)
             => mode == RenderMode.Cinema4D || mode == RenderMode.Commandline;
 
         // ---------- 配置 <-> UI ----------
 
+        /// <summary>从磁盘载入配置并灌入界面。</summary>
         private void LoadConfigIntoUi()
         {
             _cfg = AppConfig.Load();
@@ -110,6 +131,7 @@ namespace RenderServerGui.UI
             ApplyModeToUi(_cfg.Mode);
         }
 
+        /// <summary>模式下拉切换：先提交旧模式编辑，再载入新模式参数。</summary>
         private void OnModeChanged()
         {
             if (!_uiReady) return;
@@ -144,6 +166,7 @@ namespace RenderServerGui.UI
                 numFrFail.Value = Clamp(p.MaxFrameFailCount, numFrFail);
                 numMaxChunk.Value = Clamp(p.MaxChunkLength, numMaxChunk);
                 cmbFrOnFail.SelectedIndex = p.OnFail == OnFailBehaviour.Stop ? 0 : 1;
+                UpdateRangeCount();
             }
             else
             {
@@ -160,6 +183,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>把整数值夹到某 NumericUpDown 的 [Min,Max]，用于安全赋值。</summary>
         private static decimal Clamp(int v, NumericUpDown num)
         {
             if (v < (int)num.Minimum) return num.Minimum;
@@ -209,6 +233,7 @@ namespace RenderServerGui.UI
 
         // ---------- 启动 / 停止 ----------
 
+        /// <summary>启动：提交并校验参数、落盘、按模式建控制器并启动。</summary>
         private void StartCurrent()
         {
             CommitCurrentProfile();
@@ -252,6 +277,7 @@ namespace RenderServerGui.UI
             return r == DialogResult.Yes ? PreexistingChoice.KillAndStart : PreexistingChoice.Abort;
         }
 
+        /// <summary>请求停止当前控制器。</summary>
         private void StopCurrent()
         {
             if (_controller != null && _controller.IsRunning)
@@ -260,6 +286,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>校验参数是否可启动，返回是否通过并给出错误文本。</summary>
         private bool ValidateProfile(ModeProfile p, out string error)
         {
             error = null;
@@ -278,11 +305,13 @@ namespace RenderServerGui.UI
             return true;
         }
 
+        /// <summary>判断输出模板是否含星号帧号占位符。</summary>
         private static bool Regex_HasToken(string template)
         {
             return System.Text.RegularExpressions.Regex.IsMatch(template, @"\*+");
         }
 
+        /// <summary>运行中禁用参数编辑与模式切换，停止后恢复。</summary>
         private void SetRunningUi(bool running)
         {
             btnStart.Enabled = !running;
@@ -294,24 +323,28 @@ namespace RenderServerGui.UI
 
         // ---------- 控制器事件（回主线程） ----------
 
+        /// <summary>控制器日志事件：转投 UI 线程追加到日志框。</summary>
         private void OnControllerLog(object sender, LogEntry entry)
         {
             if (IsDisposed) return;
             try { BeginInvoke(new Action(() => AppendLog(entry))); } catch { }
         }
 
+        /// <summary>控制器状态事件：转投 UI 线程更新状态灯。</summary>
         private void OnControllerStatus(object sender, RunnerStatus status)
         {
             if (IsDisposed) return;
             try { BeginInvoke(new Action(() => ApplyStatus(status))); } catch { }
         }
 
+        /// <summary>控制器进度事件：转投 UI 线程更新进度条。</summary>
         private void OnControllerProgress(object sender, FrameProgressInfo info)
         {
             if (IsDisposed) return;
             try { BeginInvoke(new Action(() => ApplyProgress(info))); } catch { }
         }
 
+        /// <summary>按级别着色追加一行日志，并在超限处裁剪。</summary>
         private void AppendLog(LogEntry entry)
         {
             Color color = entry.Level == LogLevel.Error ? Color.Firebrick
@@ -349,6 +382,7 @@ namespace RenderServerGui.UI
             rtbLog.Select(rtbLog.TextLength, 0);
         }
 
+        /// <summary>按运行状态更新状态灯颜色/文字并同步按钮可用性。</summary>
         private void ApplyStatus(RunnerStatus status)
         {
             switch (status)
@@ -374,6 +408,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>按进度信息更新进度条。</summary>
         private void ApplyProgress(FrameProgressInfo info)
         {
             if (info.Total <= 0) return;
@@ -436,11 +471,7 @@ namespace RenderServerGui.UI
                 {
                     string fileName = Path.GetFileName(p.OutputTemplate);
                     string segs = BuildFrameRanges(Path.GetFileName(string.IsNullOrWhiteSpace(fileName) ? p.OutputTemplate : fileName), frames);
-                    sb.AppendLine();
                     sb.AppendLine($"识别到{segs} 等 {frames.Count} 个文件");
-                    //int expect = p.EndFrame - p.StartFrame + 1;
-                    //if (p.StartFrame >= 0 && p.EndFrame >= p.StartFrame && frames.Count < expect)
-                    //    sb.AppendLine($"（任务范围 [{p.StartFrame},{p.EndFrame}] 应有 {expect} 帧，当前识别 {frames.Count} 帧）");
                 }
             }
 
@@ -449,6 +480,7 @@ namespace RenderServerGui.UI
 
         // ---------- 浏览对话框 ----------
 
+        /// <summary>浏览选择可执行文件（主程序）。</summary>
         private void BrowseExe(TextBox target)
         {
             using (var dlg = new OpenFileDialog())
@@ -460,6 +492,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>浏览选择异常记录文件（_BugReport.txt，允许不存在）。</summary>
         private void BrowseReport(TextBox target)
         {
             using (var dlg = new OpenFileDialog())
@@ -471,6 +504,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>浏览选择 Cinema 4D 工程文件（.c4d，允许不存在）。</summary>
         private void BrowseScene(TextBox target)
         {
             using (var dlg = new OpenFileDialog())
@@ -482,6 +516,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>浏览选择文件夹并写入目标文本框。</summary>
         private void BrowseFolder(TextBox target)
         {
             using (var dlg = new FolderBrowserDialog())
@@ -492,6 +527,7 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>选择输出目录，仅替换模板的目录部分、保留含占位符的文件名。</summary>
         private void BrowseOutputFolder()
         {
             using (var dlg = new FolderBrowserDialog())
@@ -507,18 +543,14 @@ namespace RenderServerGui.UI
             }
         }
 
+        /// <summary>取路径的目录部分（用于设置对话框初始目录），无效返回 null。</summary>
         private static string initialDirOf(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return null;
             try { return Path.GetDirectoryName(path); } catch { return null; }
         }
 
-        private static string[] SafeGetFiles(string dir, string pattern)
-        {
-            try { return Directory.GetFiles(dir, pattern); }
-            catch { return new string[0]; }
-        }
-
+        /// <summary>统计目录内文件数（异常返回 0）。</summary>
         private static int CountFiles(string dir)
         {
             try { return Directory.GetFiles(dir).Length; }
@@ -542,6 +574,7 @@ namespace RenderServerGui.UI
             return string.Join("，", parts);
         }
 
+        /// <summary>打开文件对话框（可设初始目录），确定后把所选路径写入目标框。</summary>
         private void TryFill(TextBox target, OpenFileDialog dlg, string initialDir)
         {
             if (initialDir != null && Directory.Exists(initialDir)) dlg.InitialDirectory = initialDir;
@@ -551,6 +584,7 @@ namespace RenderServerGui.UI
 
         // ---------- 关闭 ----------
 
+        /// <summary>关窗前停止运行中的控制器、提交当前编辑并落盘配置。</summary>
         private void OnFormClosingHandler(object sender, FormClosingEventArgs e)
         {
             _uiReady = false;

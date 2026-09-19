@@ -33,26 +33,49 @@ namespace RenderServerGui.Services
     /// </summary>
     public class FrameRenderController : IRenderController
     {
-        // 更细粒度的单块结束原因，用于决定"杀进程→下次启动"的空载间隔
-        private enum BlockOutcome { SuccessKilled, SuccessExited, FailedProgress, FailedAbnormal, Abort }
+        /// <summary>单块结束原因，用于决定"杀进程→下次启动"的空载间隔。</summary>
+        private enum BlockOutcome
+        {
+            /// <summary>全落定且进程被我杀。</summary>
+            SuccessKilled,
+            /// <summary>全落定且进程已正常退出。</summary>
+            SuccessExited,
+            /// <summary>进程退出但仅部分落定（有前进）。</summary>
+            FailedProgress,
+            /// <summary>秒退/崩溃/无进展，达最大异常被杀。</summary>
+            FailedAbnormal,
+            /// <summary>用户停止或进程起不来。</summary>
+            Abort
+        }
 
-        private const int CircuitBreakerBlocks = 3; // 连续多少块"原地卡起点即失败"判为全局问题
-        private const int PostKillIdleSeconds = 1;  // 块产物已全落定、我把赖着的进程杀掉后，到下次启动的极短空载
-        private const int PreexistingKillSeconds = 3; // 清残留后到首次启动的间隔
+        /// <summary>连续多少块"原地卡起点即失败"判为全局问题并熔断。</summary>
+        private const int CircuitBreakerBlocks = 3;
+        /// <summary>块产物已全落定、被我杀掉的进程，到下次启动的极短空载秒数。</summary>
+        private const int PostKillIdleSeconds = 1;
+        /// <summary>清理残留进程后到首次启动的等待秒数。</summary>
+        private const int PreexistingKillSeconds = 3;
 
+        /// <summary>后台调度线程。</summary>
         private Thread _worker;
+        /// <summary>停止请求标志，令所有可中断等待尽快返回。</summary>
         private volatile bool _stopRequested;
+        /// <summary>本次运行的模式参数快照。</summary>
         private ModeProfile _p;
 
+        /// <summary>控制器是否正在运行。</summary>
         public bool IsRunning { get; private set; }
 
+        /// <summary>产生一条日志时触发。</summary>
         public event EventHandler<LogEntry> Log;
+        /// <summary>运行状态变化时触发。</summary>
         public event EventHandler<RunnerStatus> StatusChanged;
+        /// <summary>进度更新时触发。</summary>
         public event EventHandler<FrameProgressInfo> FrameProgressChanged;
 
         /// <summary>首次启动前若发现同名渲染进程已在运行，回调 UI 询问如何处理（返回决策）。为 null 时按“停止队列”保守处理。</summary>
         public Func<int, PreexistingChoice> PreexistingHandler { get; set; }
 
+        /// <summary>启动分块调度：打印参数概览并拉起后台线程。</summary>
         public void Start(ModeProfile profile)
         {
             if (IsRunning) return;
@@ -71,6 +94,7 @@ namespace RenderServerGui.Services
             _worker.Start();
         }
 
+        /// <summary>请求停止调度（结束当前渲染进程后收尾）。</summary>
         public void Stop()
         {
             if (!IsRunning) return;
@@ -81,6 +105,7 @@ namespace RenderServerGui.Services
 
         // ================= 外层：游标 + 分块推进 =================
 
+        /// <summary>外层主循环：单调游标逐块推进，按块结果决定游标前进/跳帧/停止与各档启动前空载冷却。</summary>
         private void WorkerLoop()
         {
             int start = _p.StartFrame, end = _p.EndFrame;
@@ -194,6 +219,7 @@ namespace RenderServerGui.Services
 
         // ================= 内层：一个进程渲 [a,b] 的观察 =================
 
+        /// <summary>内层：启动一个进程渲块 [a,b]，按检查间隔轮询，返回细分结束原因。异常去抖沿用 Team Render 时窗判定。</summary>
         private BlockOutcome RunBlock(int a, int b)
         {
             Process process = null;
@@ -311,9 +337,11 @@ namespace RenderServerGui.Services
 
         // ---------- 帧扫描辅助（全部夹在 [Start,End] 内） ----------
 
+        /// <summary>某帧产物是否已落定（存在·非空·距写入≥帧间冷却秒）。</summary>
         private bool IsSettled(int frame)
             => FrameScanner.IsFrameSettled(_p.OutputTemplate, frame, _p.CooldownSeconds);
 
+        /// <summary>统计区间 [a,b] 内已落定的帧数。</summary>
         private int CountSettled(int a, int b)
         {
             int n = 0;
@@ -321,16 +349,19 @@ namespace RenderServerGui.Services
             return n;
         }
 
+        /// <summary>返回区间 [a,b] 内第一个未落定的帧号；全部落定返回 -1。</summary>
         private int FirstUnsettled(int a, int b)
         {
             for (int f = a; f <= b; f++) if (!IsSettled(f)) return f;
             return -1;
         }
 
+        /// <summary>把 v 夹到 [lo,hi]。</summary>
         private static int Clamp(int v, int lo, int hi) => v < lo ? lo : (v > hi ? hi : v);
 
         // ---------- 进程与参数 ----------
 
+        /// <summary>构造渲染参数：N=1（a==b）用 `-frame a`，否则渲范围 `-frame a b 1`；带工程文件路径并加引号。</summary>
         private string BuildArguments(int a, int b)
         {
             string scene = (_p.SceneFile ?? string.Empty).Trim();
@@ -382,6 +413,7 @@ namespace RenderServerGui.Services
             return true;
         }
 
+        /// <summary>调用 taskkill 执行参数（.NET Framework 无进程树 Kill 的兜底）。</summary>
         private void RunTaskKill(string arguments)
         {
             try
@@ -397,11 +429,13 @@ namespace RenderServerGui.Services
             catch (Exception ex) { LogWarn($"taskkill 执行失败({arguments}): {ex.Message}"); }
         }
 
+        /// <summary>安全读取进程是否已退出（异常按已退出处理）。</summary>
         private static bool SafeExited(Process p)
         {
             try { return p == null || p.HasExited; } catch { return true; }
         }
 
+        /// <summary>安全读取退出码（读不到返回 int.MinValue）。</summary>
         private static int SafeExitCode(Process p)
         {
             try { return p.ExitCode; } catch { return int.MinValue; }
@@ -421,6 +455,7 @@ namespace RenderServerGui.Services
             return !_stopRequested;
         }
 
+        /// <summary>结束运行：置运行标志、抛最终状态并记一条收尾日志。</summary>
         private void Finish(RunnerStatus status)
         {
             IsRunning = false;
@@ -428,13 +463,18 @@ namespace RenderServerGui.Services
             LogInfo(status == RunnerStatus.Error ? "调度已因错误停止。" : "调度已停止。");
         }
 
+        /// <summary>抛出一帧进度更新。</summary>
         private void RaiseProgress(int completed, int total, int frame, string stage)
             => FrameProgressChanged?.Invoke(this,
                 new FrameProgressInfo { Completed = completed, Total = total, CurrentFrame = frame, Stage = stage });
 
+        /// <summary>抛出一条 Info 日志。</summary>
         private void LogInfo(string m) => Log?.Invoke(this, new LogEntry(LogLevel.Info, m));
+        /// <summary>抛出一条 Warn 日志。</summary>
         private void LogWarn(string m) => Log?.Invoke(this, new LogEntry(LogLevel.Warn, m));
+        /// <summary>抛出一条 Error 日志。</summary>
         private void LogError(string m) => Log?.Invoke(this, new LogEntry(LogLevel.Error, m));
+        /// <summary>抛出运行状态变化事件。</summary>
         private void RaiseStatus(RunnerStatus s) => StatusChanged?.Invoke(this, s);
     }
 }
