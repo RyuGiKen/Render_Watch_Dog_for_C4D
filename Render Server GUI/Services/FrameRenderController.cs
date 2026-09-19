@@ -19,7 +19,7 @@ namespace RenderServerGui.Services
     ///    块内全部落定→成功；已退出且有部分完成→立即判尝试失败；已退出无产物/崩溃报告在时窗/无进展超时→异常计数+1，
     ///    达"最大异常次数"→杀进程判尝试失败；纯无响应(未超时)只提示一次、异常清零、不杀（无窗口进程恒不触发）。
     ///
-    /// 时间参数：轮询=检查间隔；启动前空载冷却 + 启动后首轮加载宽限=帧间冷却；无进展超时/崩溃时窗独立；挂起由"无进展超时"收口。
+    /// 时间参数：轮询=检查间隔；启动后首轮以"帧间冷却"作加载宽限(此间不检测)，产物落定亦需距写入≥冷却秒；无进展超时/崩溃时窗独立；挂起由"无进展超时"收口。
     /// 全部帧号/块端点均夹到 [StartFrame,EndFrame]。
     /// </summary>
     public class FrameRenderController : IRenderController
@@ -48,7 +48,7 @@ namespace RenderServerGui.Services
             RaiseStatus(RunnerStatus.Running);
 
             int total = Math.Max(0, _p.EndFrame - _p.StartFrame + 1);
-            LogInfo($"分块渲染启动：{_p.ExePath}  -render \"{_p.SceneFile}\" -frame [起 止 1]");
+            LogInfo($"分块渲染启动：{_p.ExePath}  -render \"{_p.SceneFile}\"");
             LogInfo($"帧范围 {_p.StartFrame}–{_p.EndFrame}（共 {total} 帧），模板 {_p.OutputTemplate}，最大分块 {_p.MaxChunkLength}");
             LogInfo($"检查间隔 {_p.FrameCheckIntervalSeconds}s，无进展超时 {_p.FrameTimeoutSeconds}s，帧间冷却 {_p.CooldownSeconds}s，最大异常 {_p.MaxAbnormalCount}，帧最大失败 {_p.MaxFrameFailCount}，失败{(_p.OnFail == OnFailBehaviour.Skip ? "跳过" : "停止")}");
 
@@ -99,9 +99,6 @@ namespace RenderServerGui.Services
                     {
                         if (_stopRequested) break;
 
-                        // 每次(重)启动前空载冷却（无渲染，真正降温）
-                        if (!Idle()) break;
-
                         BlockOutcome oc = RunBlock(fa, fb);
                         if (oc == BlockOutcome.Abort) { _stopRequested = true; break; }
 
@@ -136,7 +133,7 @@ namespace RenderServerGui.Services
                             cursor = fa + 1;
                             break;
                         }
-                        LogWarn($"帧 {fa} 第 {focusFail}/{_p.MaxFrameFailCount} 次尝试无进展，冷却后重试本块。");
+                        LogWarn($"帧 {fa} 第 {focusFail}/{_p.MaxFrameFailCount} 次尝试无进展，重启本块。");
                     }
 
                     accounted = Clamp(cursor - start, 0, total);
@@ -313,7 +310,7 @@ namespace RenderServerGui.Services
             return b > a ? $"{head} -frame {a} {b} 1" : $"{head} -frame {a}";
         }
 
-        /// <summary>杀整棵进程树。杀后不在此等待——由外层每块启动前的空载冷却承担句柄释放与降温。</summary>
+        /// <summary>杀整棵进程树。杀后立即返回，由游标推进/重试决定下一步；不做额外空载等待。</summary>
         private void KillTree(Process proc)
         {
             int pid = 0;
@@ -347,14 +344,6 @@ namespace RenderServerGui.Services
         private static int SafeExitCode(Process p)
         {
             try { return p.ExitCode; } catch { return int.MinValue; }
-        }
-
-        /// <summary>块前空载冷却（可中断）；返回 false 表示收到停止。</summary>
-        private bool Idle()
-        {
-            if (_p.CooldownSeconds <= 0) return !_stopRequested;
-            LogInfo($"块间空载冷却 {_p.CooldownSeconds}s…");
-            return SleepIdle(_p.CooldownSeconds);
         }
 
         /// <summary>可中断等待；返回 false 表示期间收到停止请求。</summary>
