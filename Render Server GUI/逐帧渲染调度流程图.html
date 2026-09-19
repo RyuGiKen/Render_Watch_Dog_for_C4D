@@ -87,7 +87,7 @@
   <h2 class="c4d">②③ Cinema 4D.exe ／ Commandline.exe（共用代码 · 分块 · 外层/内层）</h2>
   <div class="diff">同一段代码，只是 exe 与崩溃路径不同。<b>唯一信号差别：Commandline 无窗口 → 不检测「无响应」</b>。块 <code>[a,b]</code> = 从游标起连续 <code>N</code> 帧（夹到末帧）；N=1 即单帧。挂起判活＝<b>600s 内无新帧落定</b>（不再用"每帧总时长"）。</div>
   <div class="params">
-    <span>最大分块长度 N <b>1</b>(≥1，夹到范围)</span><span>检查间隔 <b>30s</b></span><span>启动前空载冷却 <b>60s</b></span><span>启动后加载宽限 <b>60s</b></span>
+    <span>最大分块长度 N <b>1</b>(≥1，夹到范围)</span><span>检查间隔 <b>30s</b></span><span>落定需距写入≥帧间冷却 <b>60s</b></span><span>启动前空载冷却按结果 <b>1/30/60s</b></span>
     <span>无进展判挂起 <b>600s</b></span><span>最大异常次数 <b>5</b></span><span>帧最大失败次数 <b>4</b></span><span>崩溃时窗 <b>30×6.5=195s</b></span>
   </div>
 
@@ -97,16 +97,17 @@
     <div class="branch">
       <div class="row"><span class="edge e-sig">跳过已落定</span><span class="node">cursor 越过连续"已落定"帧（续渲/重叠）</span></div>
       <div class="row"><span class="edge e-sig">取块</span><span class="node">a = cursor；b = min(a+N-1, 末帧)；块 [a,b]（N=1 即 [a,a]）</span></div>
-      <div class="row"><span class="edge e-cool">块前空载冷却60s</span><span class="node">启动进程 <code>-render "scene" -frame a b 1</code>（N=1 时 <code>-frame a</code>）</span><span class="edge e-sig">→</span><span class="node kill">进入【内层】观察</span></div>
+      <div class="row"><span class="edge e-cool">启动前空载冷却(按上次结果 1/30/60s；首次0)</span><span class="node">启动进程 <code>-render "scene" -frame a b 1</code>（N=1 时 <code>-frame a</code>）</span><span class="edge e-sig">→</span><span class="node kill">进入【内层】观察</span></div>
       <div class="row"><span class="edge e-sig">内层返回</span><span class="node dec">结果？</span></div>
       <div class="branch">
-        <div class="row"><span class="edge e-now">成功(块全落定)</span><span class="node ok">推进计数</span> → <span class="node">cursor = b+1</span><span class="loop">↩ 下一块</span></div>
-        <div class="row"><span class="edge e-now">本块尝试失败</span><span class="node">newFirst = 块内第一个未落定帧 → newFirst &gt; a ？</span></div>
+        <div class="row"><span class="edge e-now">成功·我杀的</span><span class="node ok">cursor=b+1</span><span class="tag">下次冷却 1s</span></div>
+        <div class="row"><span class="edge e-now">成功·自然退出</span><span class="node ok">cursor=b+1</span><span class="tag">下次冷却 30s(检查间隔)</span></div>
+        <div class="row"><span class="edge e-now">失败</span><span class="node">newFirst=块内首个未落定 → newFirst &gt; a ？</span></div>
         <div class="branch">
-          <div class="row"><span class="edge e-sig">是(前进了)</span><span class="node">cursor = newFirst，focusFail=0</span><span class="loop">↩ 从 newFirst 重取块</span></div>
-          <div class="row"><span class="edge e-sig">否(原地卡起点)</span><span class="node">focusFail +1 →</span></div>
+          <div class="row"><span class="edge e-sig">是(前进了)</span><span class="node">cursor=newFirst</span><span class="tag">有产物退出=30s / 异常=60s</span></div>
+          <div class="row"><span class="edge e-sig">否(原地卡起点)</span><span class="node">focusFail+1 →</span></div>
           <div class="branch">
-            <div class="row"><span class="edge e-sig">&lt;帧最大失败4</span><span class="edge e-cool">冷却</span><span class="loop">↩ 重试同一起点 a</span></div>
+            <div class="row"><span class="edge e-sig">&lt;帧最大失败4</span><span class="edge e-cool">冷却60s</span><span class="loop">↩ 重启同一起点 a</span></div>
             <div class="row"><span class="edge e-sig">=4</span><span class="node bad">跳过起点帧：cursor=a+1，focusFail=0</span><span class="loop">↩ 下一块</span></div>
           </div>
         </div>
@@ -116,9 +117,9 @@
       <div class="row"><span class="edge e-now">cursor&gt;末帧</span><span class="node ok">结束 · 汇总（缺帧由用户下次手填范围续渲）</span></div>
     </div>
 
-    <div class="row" style="margin-top:14px;"><span class="node layer">【内层 · 一个进程的观察】</span> 异常计数=0、记录已落定进度；<b>启动后先等冷却 60s 跳过加载(不检测)</b>，之后每 <b>30s</b> 轮询：</div>
+    <div class="row" style="margin-top:14px;"><span class="node layer">【内层 · 一个进程的观察】</span> 异常计数=0、记录已落定进度；启动后每 <b>30s</b> 轮询（无进程已退出的加载误判风险）：</div>
     <div class="branch">
-      <div class="row"><span class="edge e-wait">等待(首轮60s/之后30s)</span><span class="node sig">① 收到停止 → <span class="k-bad">杀进程树</span> → 返回「停止」；(首轮仅等待不检测)</span></div>
+      <div class="row"><span class="edge e-wait">等待30s(可中断)</span><span class="node sig">① 收到停止 → <span class="k-bad">杀进程树</span> → 返回「停止」</span></div>
       <div class="row"><span class="edge e-sig">② 块内全部落定？</span><span class="node">是 → 若进程还在则<span class="k-warn">杀</span>「渲完未退出」，否则正常退出 → <span class="k-ok">返回「成功」</span></span></div>
       <div class="row"><span class="edge e-sig">③ 有新帧落定？</span><span class="node">是 → 重置「无进展计时」，视为有进展</span></div>
       <div class="row"><span class="edge e-sig">④ 崩溃报告在195s时窗内 或 进程已退出但块未全落定 或 600s无新帧落定？</span><span class="node bad">是 → 异常计数 +1（X/5）；<b>=5 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b></span></div>
@@ -126,7 +127,7 @@
       <div class="row"><span class="edge e-sig">⑥ 仅无响应(未无进展超时)</span><span class="node"><b>仅Cinema4D可观测，Commandline恒跳过</b>；只提示一次，异常计数<span class="k-ok">清零</span> → 等下一tick</span></div>
       <div class="row"><span class="edge e-now">⑦ 以上都不成立(正常推进)</span><span class="node ok">异常计数保持/清零 → 等下一tick</span></div>
     </div>
-    <div class="row"><span class="tag">"落定"= 产物存在·非空·距最后写入≥60s；空/半截文件不算落定，崩在帧7会留下→下块起点自动落到7。</span></div>
+    <div class="row"><span class="tag">"落定"= 产物存在·非空·距最后写入≥帧间冷却(60s)（预留写入等待，防半截文件）；空/半截不算落定，崩在帧7会留下→下块起点自动落到7。</span></div>
   </div>
 
   <!-- 预览说明 -->

@@ -24,18 +24,21 @@ namespace RenderServerGui.Services
     ///      newFirst>a 视为有进展，cursor=newFirst（重置焦点失败计数）；
     ///      newFirst==a 原地卡起点，焦点失败+1，达帧最大失败次数则跳过起点帧 cursor=a+1；
     ///    连续多块都"原地卡起点即失败"→ 熔断停止（防整片被静默跳过）。跨重启不留痕，由用户手填缺帧范围续渲。
-    ///  · 内层 RunBlock：只观察这一个进程。启动后首轮以"帧间冷却"跳过加载期(不检测)，之后每"检查间隔"轮询：
-    ///    块内全部落定→成功；已退出且有部分完成→立即判尝试失败；已退出无产物/崩溃报告在时窗/无进展超时→异常计数+1，
-    ///    达"最大异常次数"→杀进程判尝试失败；纯无响应(未超时)只提示一次、异常清零、不杀（无窗口进程恒不触发）。
+    ///  · 内层 RunBlock：只观察这一个进程。启动后每"检查间隔"轮询：
+    ///    块内全部落定→（进程还活着则杀）成功；已退出且有部分完成→有进展失败；已退出无产物/崩溃报告在时窗/无进展超时→异常计数+1，
+    ///    达"最大异常次数"→杀进程判异常失败；纯无响应(未超时)只提示一次、异常清零、不杀（无窗口进程恒不触发）。
     ///
-    /// 时间参数：轮询=检查间隔；启动后首轮以"帧间冷却"作加载宽限(此间不检测)，产物落定亦需距写入≥冷却秒；无进展超时/崩溃时窗独立；挂起由"无进展超时"收口。
+    /// 时间参数：轮询=检查间隔；"杀进程→下次启动"之间按结束原因插入空载冷却（自杀成功1s / 自然退出或有进展→30s检查间隔 / 秒退·崩溃·无进展异常或跳帧→60s帧间冷却 / 清残留→3s），此间无进程真正降温；产物落定需距最后写入≥帧间冷却秒；无进展超时/崩溃时窗独立；挂起由"无进展超时"收口。
     /// 全部帧号/块端点均夹到 [StartFrame,EndFrame]。
     /// </summary>
     public class FrameRenderController : IRenderController
     {
-        private enum BlockOutcome { Success, AttemptFailed, Abort }
+        // 更细粒度的单块结束原因，用于决定"杀进程→下次启动"的空载间隔
+        private enum BlockOutcome { SuccessKilled, SuccessExited, FailedProgress, FailedAbnormal, Abort }
 
         private const int CircuitBreakerBlocks = 3; // 连续多少块"原地卡起点即失败"判为全局问题
+        private const int PostKillIdleSeconds = 1;  // 块产物已全落定、我把赖着的进程杀掉后，到下次启动的极短空载
+        private const int PreexistingKillSeconds = 3; // 清残留后到首次启动的间隔
 
         private Thread _worker;
         private volatile bool _stopRequested;
@@ -101,13 +104,14 @@ namespace RenderServerGui.Services
             int cursor = start;
             int consecStall = 0;
             int accounted = 0;
+            int preIdle = 0; // 下次启动前的空载冷却（无进程时降温）；0=首次直接启动
             RunnerStatus final = RunnerStatus.Stopped;
 
             try
             {
                 while (cursor <= end && !_stopRequested)
                 {
-                    // 跳过已落定的帧（续渲/重叠），不额外冷却
+                    // 跳过已落定的帧（续渲/重叠）
                     while (cursor <= end && IsSettled(cursor)) cursor++;
                     if (cursor > end) break;
 
@@ -119,32 +123,35 @@ namespace RenderServerGui.Services
                     {
                         if (_stopRequested) break;
 
+                        // 启动前空载冷却（此间无渲染进程）
+                        if (preIdle > 0 && !SleepIdle(preIdle)) break;
+
                         BlockOutcome oc = RunBlock(fa, fb);
                         if (oc == BlockOutcome.Abort) { _stopRequested = true; break; }
 
-                        if (oc == BlockOutcome.Success)
+                        if (oc == BlockOutcome.SuccessKilled) // 全落定但进程赖着，被我杀 → 只需极短
                         {
-                            consecStall = 0;
-                            cursor = fb + 1;
-                            break;
+                            consecStall = 0; preIdle = PostKillIdleSeconds; cursor = fb + 1; break;
+                        }
+                        if (oc == BlockOutcome.SuccessExited)  // 全落定且进程正常退出
+                        {
+                            consecStall = 0; preIdle = _p.FrameCheckIntervalSeconds; cursor = fb + 1; break;
                         }
 
-                        // 尝试失败：看块内有无前进
+                        // 失败：按实际产物决定游标
                         int newFirst = FirstUnsettled(fa, fb);
-                        if (newFirst < 0) // 其实全落定
-                        {
-                            consecStall = 0;
-                            cursor = fb + 1;
-                            break;
-                        }
-                        if (newFirst > fa) // 有进展：游标推到首个未落定，重取块
+                        if (newFirst < 0) { consecStall = 0; preIdle = _p.FrameCheckIntervalSeconds; cursor = fb + 1; break; }
+
+                        if (newFirst > fa) // 有进展：游标推到缺口，重取块
                         {
                             consecStall = 0;
                             cursor = newFirst;
+                            preIdle = oc == BlockOutcome.FailedProgress ? _p.FrameCheckIntervalSeconds : _p.CooldownSeconds;
                             break;
                         }
 
-                        // 原地卡起点帧
+                        // 原地卡起点帧：秒退/崩溃/无进展/跳帧，均给帧间冷却降温
+                        preIdle = _p.CooldownSeconds;
                         focusFail++;
                         if (focusFail >= _p.MaxFrameFailCount)
                         {
@@ -159,7 +166,7 @@ namespace RenderServerGui.Services
                             cursor = fa + 1;
                             break;
                         }
-                        LogWarn($"帧 {fa} 第 {focusFail}/{_p.MaxFrameFailCount} 次尝试无进展，重启本块。");
+                        LogWarn($"帧 {fa} 第 {focusFail}/{_p.MaxFrameFailCount} 次尝试无进展，冷却后重启本块。");
                     }
 
                     accounted = Clamp(cursor - start, 0, total);
@@ -212,14 +219,6 @@ namespace RenderServerGui.Services
                 var startT = DateTime.Now;
                 var crashWindow = TimeSpan.FromSeconds(_p.FrameCheckIntervalSeconds * (_p.MaxAbnormalCount + 1.5)); // 与 Team Render 同款时窗
 
-                // 启动后首轮：以帧间冷却跳过加载期，期间不检测
-                if (!SleepIdle(_p.CooldownSeconds))
-                {
-                    KillTree(process);
-                    return BlockOutcome.Abort;
-                }
-                if (_stopRequested) { KillTree(process); return BlockOutcome.Abort; }
-
                 int abnormal = 0;
                 int lastSettled = 0;
                 var lastProgress = startT;
@@ -235,10 +234,14 @@ namespace RenderServerGui.Services
                     if (allSettled)
                     {
                         bool alive = !SafeExited(process);
-                        if (alive) LogInfo($"块[{a},{b}] 全部落定但进程未退出，结束进程并计成功。");
-                        else LogInfo($"块[{a},{b}] 渲染完成（退出码 {SafeExitCode(process)}）。");
-                        if (alive) KillTree(process);
-                        return BlockOutcome.Success;
+                        if (alive)
+                        {
+                            LogInfo($"块[{a},{b}] 全部落定但进程未退出，结束进程并计成功。");
+                            KillTree(process);
+                            return BlockOutcome.SuccessKilled;
+                        }
+                        LogInfo($"块[{a},{b}] 渲染完成（退出码 {SafeExitCode(process)}）。");
+                        return BlockOutcome.SuccessExited;
                     }
 
                     if (settled > lastSettled) { lastSettled = settled; lastProgress = DateTime.Now; }
@@ -258,7 +261,7 @@ namespace RenderServerGui.Services
                     if (exited && settled > 0 && !allSettled)
                     {
                         LogWarn($"块[{a},{b}] 进程退出、已完成 {settled}/{blockLen} 帧，判本次尝试失败，外层从缺口续渲。");
-                        return BlockOutcome.AttemptFailed;
+                        return BlockOutcome.FailedProgress;
                     }
 
                     string badReason = null;
@@ -274,7 +277,7 @@ namespace RenderServerGui.Services
                         {
                             LogWarn($"块[{a},{b}] 连续异常达 {_p.MaxAbnormalCount} 次，结束进程，判本次尝试失败。");
                             KillTree(process);
-                            return BlockOutcome.AttemptFailed;
+                            return BlockOutcome.FailedAbnormal;
                         }
                     }
                     else
@@ -374,7 +377,7 @@ namespace RenderServerGui.Services
                 try { KillTree(p); }
                 finally { try { p.Dispose(); } catch { } }
             }
-            SleepIdle(3); // 稍候确保句柄释放
+            SleepIdle(PreexistingKillSeconds); // 稍候确保句柄释放
             LogInfo("残留进程已清理，开始渲染。");
             return true;
         }
