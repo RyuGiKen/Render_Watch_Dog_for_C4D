@@ -6,6 +6,15 @@ using RenderServerGui.Models;
 
 namespace RenderServerGui.Services
 {
+    /// <summary>首次启动前发现同名渲染进程已在运行时的处理选择。</summary>
+    public enum PreexistingChoice
+    {
+        /// <summary>停止本次调度，不动已有进程。</summary>
+        Abort,
+        /// <summary>杀掉残留进程树后再开始新渲染。</summary>
+        KillAndStart
+    }
+
     /// <summary>
     /// 单帧/分块调度控制器，Cinema 4D 与 Commandline 严格共用同一段代码（差异只在 exe 与崩溃记录路径）。
     ///
@@ -37,6 +46,9 @@ namespace RenderServerGui.Services
         public event EventHandler<LogEntry> Log;
         public event EventHandler<RunnerStatus> StatusChanged;
         public event EventHandler<FrameProgressInfo> FrameProgressChanged;
+
+        /// <summary>首次启动前若发现同名渲染进程已在运行，回调 UI 询问如何处理（返回决策）。为 null 时按“停止队列”保守处理。</summary>
+        public Func<int, PreexistingChoice> PreexistingHandler { get; set; }
 
         public void Start(ModeProfile profile)
         {
@@ -74,6 +86,14 @@ namespace RenderServerGui.Services
             {
                 LogError("结束帧小于起始帧，无帧可渲染。");
                 Finish(RunnerStatus.Error);
+                return;
+            }
+
+            // 首次启动前：若已有同名渲染进程在跑，弹窗让用户决定“停止队列”或“杀残留再启动”
+            if (!HandlePreexisting())
+            {
+                LogWarn("用户选择停止，未启动渲染。");
+                Finish(RunnerStatus.Stopped);
                 return;
             }
 
@@ -319,6 +339,38 @@ namespace RenderServerGui.Services
             if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
             try { if (proc != null && !proc.HasExited) { proc.Kill(); proc.WaitForExit(5000); } } catch { }
             if (pid > 0) RunTaskKill($"/F /T /PID {pid}");
+        }
+
+        /// <summary>首次启动前检测同名残留进程：无→继续；有→按 UI 决策“杀干净继续”或“停止不启动”。</summary>
+        private bool HandlePreexisting()
+        {
+            Process[] leftovers;
+            try { leftovers = Process.GetProcessesByName(_p.ProcessName); }
+            catch { return true; }
+
+            if (leftovers == null || leftovers.Length == 0) return true;
+
+            int count = leftovers.Length;
+            PreexistingChoice choice = PreexistingHandler != null
+                ? PreexistingHandler(count)
+                : PreexistingChoice.Abort;
+
+            if (choice == PreexistingChoice.Abort)
+            {
+                LogWarn($"检测到 {count} 个 {(_p.ProcessName)} 进程在运行；按选择停止调度，未启动、也不动这些进程。");
+                foreach (var p in leftovers) { try { p.Dispose(); } catch { } }
+                return false;
+            }
+
+            LogWarn($"检测到 {count} 个残留 {(_p.ProcessName)} 进程，正在结束…");
+            foreach (var p in leftovers)
+            {
+                try { KillTree(p); }
+                finally { try { p.Dispose(); } catch { } }
+            }
+            SleepIdle(3); // 稍候确保句柄释放
+            LogInfo("残留进程已清理，开始渲染。");
+            return true;
         }
 
         private void RunTaskKill(string arguments)

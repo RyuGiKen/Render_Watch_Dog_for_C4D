@@ -226,12 +226,30 @@ namespace RenderServerGui.UI
             _controller = IsFrameMode(_cfg.Mode)
                 ? (IRenderController)new FrameRenderController()
                 : new TeamRenderController();
+            if (_controller is FrameRenderController frc)
+                frc.PreexistingHandler = AskPreexisting;
             _controller.Log += OnControllerLog;
             _controller.StatusChanged += OnControllerStatus;
             _controller.FrameProgressChanged += OnControllerProgress;
 
             SetRunningUi(true);
             _controller.Start(p);
+        }
+
+        /// <summary>首次启动前发现同名进程：在 UI 线程弹窗询问“杀残留再启动 / 停止队列”，返回决策。由后台线程经 Invoke 调来。</summary>
+        private PreexistingChoice AskPreexisting(int count)
+        {
+            if (InvokeRequired)
+                return (PreexistingChoice)Invoke(new Func<int, PreexistingChoice>(AskPreexisting), count);
+
+            string name = _cfg.ProfileOf(_cfg.Mode)?.ProcessName ?? "渲染";
+            var r = MessageBox.Show(this,
+                $"检测到已有 {count} 个「{name}」进程在运行。\n\n" +
+                "选“是”＝结束这些残留进程后再开始队列；\n" +
+                "选“否”＝停止本次调度（不启动、也不动这些进程）。",
+                "已存在渲染进程", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+            return r == DialogResult.Yes ? PreexistingChoice.KillAndStart : PreexistingChoice.Abort;
         }
 
         private void StopCurrent()
