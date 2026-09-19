@@ -150,8 +150,7 @@ namespace RenderServerGui.Services
                         {
                             if (_p.OnFail == OnFailBehaviour.Stop)
                             {
-                                LogError($"帧 {fa} 连续 {focusFail} 次尝试无进展，按策略停止调度。");
-                                final = RunnerStatus.Error;
+                                LogWarn($"帧 {fa} 连续 {focusFail} 次尝试无进展，按策略停止调度。");
                                 cursor = end + 1; // 退出外层 while
                                 break;
                             }
