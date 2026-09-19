@@ -148,6 +148,13 @@ namespace RenderServerGui.Services
                         focusFail++;
                         if (focusFail >= _p.MaxFrameFailCount)
                         {
+                            if (_p.OnFail == OnFailBehaviour.Stop)
+                            {
+                                LogError($"帧 {fa} 连续 {focusFail} 次尝试无进展，按策略停止调度。");
+                                final = RunnerStatus.Error;
+                                cursor = end + 1; // 退出外层 while
+                                break;
+                            }
                             consecStall++;
                             LogWarn($"帧 {fa} 连续 {focusFail} 次尝试无进展，跳过该帧。");
                             cursor = fa + 1;

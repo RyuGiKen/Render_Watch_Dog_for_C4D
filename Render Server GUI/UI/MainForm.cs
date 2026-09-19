@@ -12,7 +12,7 @@ namespace RenderServerGui.UI
 {
     /// <summary>
     /// 主窗体：模式切换、参数编辑、启动/停止、日志与进度显示、配置持久化。
-    /// 阶段一为框架 + UI；引擎逻辑在 TeamRenderController / FrameRenderController 中，当前为占位。
+    /// 判定/渲染逻辑在 TeamRenderController 与 FrameRenderController（分块/逐帧游标）中，本文件只做界面与调度编排。
     /// </summary>
     public partial class MainForm : Form
     {
