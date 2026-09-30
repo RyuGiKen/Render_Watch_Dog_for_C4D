@@ -31,8 +31,8 @@ A Cinema 4D watchdog + multi-task per-frame/chunk render scheduler (Windows desk
   崩溃报告按时间窗计数：命中+1、达上限才杀、出窗清零。  
   Crash reports are counted within a time window: +1 on hit, kill only at the limit, clear when out of window.
 - **挂起=无进展超时** / Hang = no-progress timeout  
-  GUI 高负载"无响应"不杀进程；连续无新帧落定超过无进展超时才判挂起。  
-  Under heavy load "not responding" is normal; a hang is declared only when no new frame appears within the no-progress timeout.
+  GUI 高负载"无响应"不杀进程；只要产物仍有写入活动（新帧落定或文件更新中）就持续重置计时，块内逐帧产出不空等；超过无进展超时且完全无产物写入才杀进程重试（首现记录、下一轮复查确认）。  
+  Under heavy load "not responding" is normal; any output write activity (a settled frame or a file being written) keeps resetting the timer, so multi-frame chunks never idle-wait. The process is killed only after the no-progress timeout with zero output writes (first seen, then re-checked next round).
 - **热崩冷却** / Cooldown after kill  
   每次杀进程后按结果插入 1/30/60s 的空载冷却，兼顾满载散热。  
   After each kill an idle cooldown (1/30/60 s by outcome) lets the machine cool down.

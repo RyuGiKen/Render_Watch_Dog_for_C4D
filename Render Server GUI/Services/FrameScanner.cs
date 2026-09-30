@@ -84,6 +84,36 @@ namespace RenderServerGui.Services
         }
 
         /// <summary>
+        /// 目录内所有"符合同一命名规则"的产物文件中最新的最后写入时刻（UTC）。
+        /// 用于无进展检测：产物 mtime 前进 = 渲染仍在正常产出（含正在写盘的半截文件）。
+        /// 目录不存在、无产物或出错返回 DateTime.MinValue。
+        /// </summary>
+        public static DateTime GetLatestWriteTimeUtc(string template)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(template) || !TokenRegex.IsMatch(template))
+                    return DateTime.MinValue;
+
+                string dir = Path.GetDirectoryName(template);
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                    return DateTime.MinValue;
+
+                var di = new DirectoryInfo(dir);
+                DateTime latest = DateTime.MinValue;
+                foreach (FileInfo fi in di.GetFiles(Path.GetFileName(ToGlob(template))))
+                {
+                    if (fi.LastWriteTimeUtc > latest) latest = fi.LastWriteTimeUtc;
+                }
+                return latest;
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
+
+        /// <summary>
         /// 按命名模板解析目录里"符合同一命名规则"的文件帧号，返回去重升序列表。
         /// 占位星号段转成捕获组 (\\d+)，对每个文件"整名"匹配；带前后缀的多通道文件整名不匹配→忽略。
         /// 模板无占位符或目录不存在时返回空。

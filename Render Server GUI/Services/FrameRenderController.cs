@@ -24,10 +24,12 @@ namespace RenderServerGui.Services
     ///    启动进程渲这一段；成功→cursor=b+1；崩了→重算块内第一个未落定帧 newFirst：
     ///      newFirst>a 视为有进展，cursor=newFirst（重置焦点失败计数）；
     ///      newFirst==a 原地卡起点，焦点失败+1，达帧最大失败次数则跳过起点帧 cursor=a+1；
-    ///    连续多块都"原地卡起点即失败"→ 熔断停止（防整片被静默跳过）。跨重启不留痕，由用户手填缺帧范围续渲。
+    ///    连续多块都"原地卡起点即失败"→ 熔断跳过当前任务、继续队列下一个（防整片被静默跳过又不终止整场）。跨重启不留痕，由用户手填缺帧范围续渲。
     ///  · 内层 RunBlock：只观察这一个进程。启动后每"检查间隔"轮询：
-    ///    块内全部落定→（进程还活着则杀）成功；已退出且有部分完成→有进展失败；已退出无产物/崩溃报告在时窗/无进展超时→异常计数+1，
-    ///    达"最大异常次数"→杀进程判异常失败；纯无响应(未超时)只提示一次、异常清零、不杀（无窗口进程恒不触发）。
+    ///    块内全部落定→（进程还活着则杀）成功；已退出且有部分完成→有进展失败；
+    ///    无进展判定：落定数增加或产物文件 mtime 前进（正在写盘也算正常产出）都会重置计时；
+    ///    进程活着但持续无任何产物写入、超过"无进展超时"→ 首现记录、下一轮复查仍超时即杀（不走异常去抖）；
+    ///    已退出无产物/崩溃报告在时窗→异常计数+1，达"最大异常次数"→杀进程判异常失败；纯无响应(未超时)只提示一次、异常清零、不杀（无窗口进程恒不触发）。
     ///
     /// 时间参数：轮询=检查间隔；"杀进程→下次启动"之间按结束原因插入空载冷却（自杀成功1s / 自然退出或有进展→30s检查间隔 / 秒退·崩溃·无进展异常或跳帧→60s帧间冷却 / 清残留→3s），此间无进程真正降温；产物落定需距最后写入≥帧间冷却秒；无进展超时/崩溃时窗独立；挂起由"无进展超时"收口。
     /// 全部帧号/块端点均夹到 [StartFrame,EndFrame]。
@@ -43,7 +45,7 @@ namespace RenderServerGui.Services
             SuccessExited,
             /// <summary>进程退出但仅部分落定（有前进）。</summary>
             FailedProgress,
-            /// <summary>秒退/崩溃/无进展，达最大异常被杀。</summary>
+            /// <summary>秒退/崩溃达最大异常被杀，或无进展超时复查后被杀。</summary>
             FailedAbnormal,
             /// <summary>用户停止或进程起不来。</summary>
             Abort
@@ -269,7 +271,7 @@ namespace RenderServerGui.Services
 
         // ================= 内层：一个进程渲 [a,b] 的观察 =================
 
-        /// <summary>内层：启动一个进程渲块 [a,b]，按检查间隔轮询，返回细分结束原因。异常去抖沿用 Team Render 时窗判定。</summary>
+        /// <summary>内层：启动一个进程渲块 [a,b]，按检查间隔轮询，返回细分结束原因。无进展按产物写入活动判定；秒退/崩溃报告保留异常计数去抖。</summary>
         private BlockOutcome RunBlock(int a, int b)
         {
             Process process = null;
@@ -298,6 +300,8 @@ namespace RenderServerGui.Services
                 int abnormal = 0;
                 int lastSettled = 0;
                 var lastProgress = startT;
+                var lastWriteUtc = DateTime.MinValue;   // 块内产物最近见到的写入时刻；mtime 前进 = 渲染在正常产出
+                DateTime? noProgressSince = null;       // 无进展超时首现时刻（下一轮复查仍超时才杀）
                 bool loggedNoResp = false;
                 int blockLen = b - a + 1;
 
@@ -320,7 +324,10 @@ namespace RenderServerGui.Services
                         return BlockOutcome.SuccessExited;
                     }
 
+                    // 进展判定：落定数增加，或产物文件 mtime 前进（正在写盘也算正常产出），二者任一即重置无进展计时
                     if (settled > lastSettled) { lastSettled = settled; lastProgress = DateTime.Now; }
+                    var writeUtc = FrameScanner.GetLatestWriteTimeUtc(_currentTask.OutputTemplate);
+                    if (writeUtc > lastWriteUtc) { lastWriteUtc = writeUtc; lastProgress = DateTime.Now; }
 
                     bool exited = SafeExited(process);
                     bool noProgress = (DateTime.Now - lastProgress).TotalSeconds > _currentTask.FrameTimeoutSeconds;
@@ -340,10 +347,27 @@ namespace RenderServerGui.Services
                         return BlockOutcome.FailedProgress;
                     }
 
+                    // 无进展超时：进程活着但持续无任何产物写入活动 → 下轮复查仍超时即杀（不走异常去抖）
+                    if (noProgress && noProgressSince == null)
+                    {
+                        noProgressSince = DateTime.Now;
+                        LogWarn(Localizer.Tf("log.fr.noProgressFirst", "块[{0},{1}] 无进展超时首现（{2}s 内无产物写入），下一轮复查。", a, b, _currentTask.FrameTimeoutSeconds));
+                    }
+                    else if (noProgress && noProgressSince != null)
+                    {
+                        LogWarn(Localizer.Tf("log.fr.noProgressKill", "块[{0},{1}] 复查仍无产物写入，按无进展超时（{2}s）结束进程重试。", a, b, _currentTask.FrameTimeoutSeconds));
+                        KillTree(process);
+                        return BlockOutcome.FailedAbnormal;
+                    }
+                    else if (!noProgress)
+                    {
+                        noProgressSince = null; // 出现写入活动，恢复计时
+                    }
+
+                    // 秒退/崩溃报告属瞬时信号，保留异常计数去抖
                     string badReason = null;
                     if (exited && settled == 0) badReason = Localizer.T("log.fr.reasonSnappy", "已退出无产物(秒退)");
                     else if (crash) badReason = Localizer.T("log.fr.reasonCrash", "崩溃报告在时窗内");
-                    else if (noProgress) badReason = Localizer.Tf("log.fr.reasonNoProgress", "{0}s 无新帧落定", _currentTask.FrameTimeoutSeconds);
 
                     if (badReason != null)
                     {

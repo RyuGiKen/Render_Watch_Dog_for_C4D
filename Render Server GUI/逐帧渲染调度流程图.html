@@ -130,11 +130,12 @@
     <div class="branch">
       <div class="row"><span class="edge e-wait">等待30s(可中断)</span><span class="node sig">① 收到停止 → <span class="k-bad">杀进程树</span> → 返回「停止」</span></div>
       <div class="row"><span class="edge e-sig">② 块内全部落定？</span><span class="node">是 → 若进程还在则<span class="k-warn">杀</span>「渲完未退出」，否则正常退出 → <span class="k-ok">返回「成功」</span></span></div>
-      <div class="row"><span class="edge e-sig">③ 有新帧落定？</span><span class="node">是 → 重置「无进展计时」，视为有进展</span></div>
-      <div class="row"><span class="edge e-sig">④ 崩溃报告在195s时窗内 或 进程已退出但块未全落定 或 无进展超时(按任务,默认600s)内无新帧落定？</span><span class="node bad">是 → 异常计数 +1（X/5）；<b>=5 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b></span></div>
-      <div class="row"><span class="edge e-sig">⑤ 已退出且块内已有部分落定</span><span class="node">立即 <span class="k-warn">返回「尝试失败」</span>（外层前进到缺口续渲，不空等去抖）</span></div>
-      <div class="row"><span class="edge e-sig">⑥ 仅无响应(未无进展超时)</span><span class="node"><b>仅Cinema4D可观测，Commandline恒跳过</b>；只提示一次，异常计数<span class="k-ok">清零</span> → 等下一tick</span></div>
-      <div class="row"><span class="edge e-now">⑦ 以上都不成立(正常推进)</span><span class="node ok">异常计数保持/清零 → 等下一tick</span></div>
+      <div class="row"><span class="edge e-sig">③ 有产物写入活动？</span><span class="node">新帧落定 或 产物文件 mtime 前进（<b>正在写盘的半截文件也算</b>）→ 重置「无进展计时」</span></div>
+      <div class="row"><span class="edge e-sig">④ 无进展超时(按任务,默认600s)？</span><span class="node bad">进程活着但持续<b>无任何产物写入</b> → 首现记录；<b>下一轮复查仍超时 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b>（不走异常去抖，出现写入即恢复计时）</span></div>
+      <div class="row"><span class="edge e-sig">⑤ 崩溃报告在195s时窗内 或 已退出无产物(秒退)？</span><span class="node bad">是 → 异常计数 +1（X/5）；<b>=5 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b></span></div>
+      <div class="row"><span class="edge e-sig">⑥ 已退出且块内已有部分落定</span><span class="node">立即 <span class="k-warn">返回「尝试失败」</span>（外层前进到缺口续渲，不空等去抖）</span></div>
+      <div class="row"><span class="edge e-sig">⑦ 仅无响应(未无进展超时)</span><span class="node"><b>仅Cinema4D可观测，Commandline恒跳过</b>；只提示一次，异常计数<span class="k-ok">清零</span> → 等下一tick</span></div>
+      <div class="row"><span class="edge e-now">⑧ 以上都不成立(正常推进)</span><span class="node ok">异常计数保持/清零 → 等下一tick</span></div>
     </div>
     <div class="row"><span class="tag">"落定"= 产物存在·非空·距最后写入≥帧间冷却(60s)（预留写入等待，防半截文件）；空/半截不算落定，崩在帧7会留下→下块起点自动落到7。</span></div>
   </div>
@@ -160,7 +161,7 @@
   <div class="tree" style="font-size:13px;">
     <div class="row">• <b>多任务队列：</b>C4D / Commandline 每模式一组任务，<b>严格按列表顺序串行</b>；任务间先等帧间冷却(60s)再启动下一任务。任务主键(如 任务001)添加时按现有最大值+1 分配、删除不回收。</div>
     <div class="row">• <b>统一模型：</b>N=1 退化为单帧（块=[a,a]），单帧/分块同一套代码。</div>
-    <div class="row">• <b>挂起：</b>由"每帧总超时"改为<b>无进展超时（按任务设置，默认600s）无新帧落定</b>；块多长都不误杀，块内卡死也能及时抓。无响应仍只提示、不杀（Commandline 无窗口自动跳过）。</div>
+    <div class="row">• <b>挂起：</b>由"每帧总超时"改为<b>无进展超时（按任务设置，默认600s）无任何产物写入</b>；写入活动=新帧落定或产物 mtime 前进（写盘中也算），块内逐帧产出都会持续重置计时。超时首现记录、下一轮复查仍无写入才杀（防 mtime 延迟误杀）。无响应仍只提示、不杀（Commandline 无窗口自动跳过）。</div>
     <div class="row">• <b>报错(崩溃报告)：</b>195s 时窗命中即+1、达最大异常次数(5)才杀、出窗清零——与①同款去抖。</div>
     <div class="row">• <b>推进/跳过：</b>前进就重置焦点失败计数；原地卡满帧最大失败(4)才跳起点帧，游标只前进不留内部洞；跨重启不留痕、用户手填范围。</div>
     <div class="row">• <b>熔断：</b>连续3块原地即失败→判全局问题，<b>跳过当前任务继续下一任务</b>（不再终止整场）；「停止」操作仍是终止整场。</div>
