@@ -208,8 +208,8 @@ namespace RenderServerGui.UI
 
             // 单帧分组 - 任务
             lblTaskList.Text = Localizer.T("ui.taskList", "任务队列");
-            btnTaskAdd.Text = Localizer.T("ui.taskAdd", "添加");
-            btnTaskRemove.Text = Localizer.T("ui.taskRemove", "删除");
+            btnTaskAdd.Text = Localizer.T("ui.taskAdd", "+");
+            btnTaskRemove.Text = Localizer.T("ui.taskRemove", "-");
             lblTaskDetail.Text = Localizer.T("ui.taskDetail", "选中任务参数");
             lblFrScene.Text = Localizer.T("ui.scene", "工程文件");
             lblFrOutput.Text = Localizer.T("ui.output", "输出模板");
@@ -438,6 +438,9 @@ namespace RenderServerGui.UI
             t.FrameTimeoutSeconds = (int)numFrTimeout.Value;
         }
 
+        /// <summary>任务数上限：列表与启动校验共用（到达后拒绝添加/启动并弹窗提示）。</summary>
+        private const int MaxTaskCount = 99;
+
         /// <summary>
         /// 编辑区参数变化：立即写回当前选中任务（内存配置），并同步刷新列表项显示。
         /// 程序性赋值（LoadTaskToUi 等）经 _suppressTaskSelect 抑制，不触发。
@@ -453,10 +456,18 @@ namespace RenderServerGui.UI
             _suppressTaskSelect = false;
         }
 
-        /// <summary>添加任务：复制当前选中项（或空白）追加到末尾并选中；主键=现有最大值+1（删除不回收）。</summary>
+        /// <summary>添加任务：复制当前选中项（或空白）追加到末尾并选中；主键=现有最大值+1（删除不回收）。
+        /// 任务数达上限（99）或主键达 int 上限时拒绝添加并弹窗提示（防护，正常使用到不了）。</summary>
         private void OnTaskAdd()
         {
             if (_tasks == null) return;
+            if (_tasks.Count >= MaxTaskCount)
+            {
+                MessageBox.Show(this,
+                    Localizer.Tf("msg.taskLimit", "任务数已达上限 {0} 个，无法继续添加。", MaxTaskCount),
+                    Localizer.T("msg.limitTitle", "无法添加"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             CommitTaskFromUi();
             RenderTask newTask;
             int sel = lstTasks.SelectedIndex;
@@ -466,6 +477,13 @@ namespace RenderServerGui.UI
                 newTask = RenderTask.CreateDefault();
             int maxId = 0;
             foreach (var t in _tasks) { if (t.TaskId > maxId) maxId = t.TaskId; }
+            if (maxId >= int.MaxValue)
+            {
+                MessageBox.Show(this,
+                    Localizer.T("msg.taskIdLimit", "任务编号已达 int 上限（2147483647），无法继续添加。"),
+                    Localizer.T("msg.limitTitle", "无法添加"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             newTask.TaskId = maxId + 1;
             _tasks.Add(newTask);
             int newIdx = _tasks.Count - 1;
@@ -626,6 +644,11 @@ namespace RenderServerGui.UI
                 if (p.Tasks == null || p.Tasks.Count == 0)
                 {
                     error = Localizer.T("msg.noTasks", "任务队列为空，请至少添加一个任务。");
+                    return false;
+                }
+                if (p.Tasks.Count > MaxTaskCount)
+                {
+                    error = Localizer.Tf("msg.tooManyTasks", "任务数超过上限 {0} 个。", MaxTaskCount);
                     return false;
                 }
                 for (int i = 0; i < p.Tasks.Count; i++)
@@ -811,7 +834,7 @@ namespace RenderServerGui.UI
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Title = "选择主程序";
+                dlg.Title = Localizer.T("dlg.pickExe", "选择主程序");
                 dlg.Filter = "可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*";
                 dlg.CheckFileExists = false;
                 TryFill(target, dlg, initialDirOf(target.Text));
@@ -822,7 +845,7 @@ namespace RenderServerGui.UI
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Title = "选择异常记录文件";
+                dlg.Title = Localizer.T("dlg.pickReport", "选择异常记录文件");
                 dlg.Filter = "BugReport (_BugReport.txt)|_BugReport.txt|所有文件 (*.*)|*.*";
                 dlg.CheckFileExists = false;
                 TryFill(target, dlg, initialDirOf(target.Text));
@@ -833,7 +856,7 @@ namespace RenderServerGui.UI
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Title = "选择工程文件";
+                dlg.Title = Localizer.T("dlg.pickScene", "选择工程文件");
                 dlg.Filter = "Cinema 4D 工程 (*.c4d)|*.c4d|所有文件 (*.*)|*.*";
                 dlg.CheckFileExists = false;
                 TryFill(target, dlg, initialDirOf(target.Text));

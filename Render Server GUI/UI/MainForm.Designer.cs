@@ -319,7 +319,7 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.btnFrPreview);
             this.grpFrame.Location = new System.Drawing.Point(8, 6);
             this.grpFrame.Name = "grpFrame";
-            this.grpFrame.Size = new System.Drawing.Size(560, 585);
+            this.grpFrame.Size = new System.Drawing.Size(560, 600);
             this.grpFrame.Text = "单帧调度参数";
             this.grpFrame.Visible = false;
 
@@ -353,38 +353,38 @@ namespace RenderServerGui.UI
 
             // ── 任务队列区 ──
             this.lblTaskList.AutoSize = true; this.lblTaskList.Location = new System.Drawing.Point(14, 224); this.lblTaskList.Name = "lblTaskList"; this.lblTaskList.Text = "任务队列"; this.lblTaskList.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
-            this.lstTasks.Location = new System.Drawing.Point(14, 246); this.lstTasks.Name = "lstTasks"; this.lstTasks.Size = new System.Drawing.Size(430, 100);
+            this.lstTasks.Location = new System.Drawing.Point(14, 246); this.lstTasks.Name = "lstTasks"; this.lstTasks.Size = new System.Drawing.Size(470, 122);
             this.lstTasks.IntegralHeight = false;
             this.lstTasks.SelectionMode = System.Windows.Forms.SelectionMode.One;
-            this.btnTaskAdd.Location = new System.Drawing.Point(454, 246); this.btnTaskAdd.Name = "btnTaskAdd"; this.btnTaskAdd.Size = new System.Drawing.Size(90, 26); this.btnTaskAdd.Text = "添加"; this.btnTaskAdd.UseVisualStyleBackColor = true;
-            this.btnTaskRemove.Location = new System.Drawing.Point(454, 278); this.btnTaskRemove.Name = "btnTaskRemove"; this.btnTaskRemove.Size = new System.Drawing.Size(90, 26); this.btnTaskRemove.Text = "删除"; this.btnTaskRemove.UseVisualStyleBackColor = true;
-            this.btnTaskUp.Location = new System.Drawing.Point(454, 310); this.btnTaskUp.Name = "btnTaskUp"; this.btnTaskUp.Size = new System.Drawing.Size(42, 26); this.btnTaskUp.Text = "↑"; this.btnTaskUp.UseVisualStyleBackColor = true;
-            this.btnTaskDown.Location = new System.Drawing.Point(502, 310); this.btnTaskDown.Name = "btnTaskDown"; this.btnTaskDown.Size = new System.Drawing.Size(42, 26); this.btnTaskDown.Text = "↓"; this.btnTaskDown.UseVisualStyleBackColor = true;
+            this.btnTaskAdd.Location = new System.Drawing.Point(492, 246); this.btnTaskAdd.Name = "btnTaskAdd"; this.btnTaskAdd.Size = new System.Drawing.Size(30, 26); this.btnTaskAdd.Text = "+"; this.btnTaskAdd.UseVisualStyleBackColor = true;
+            this.btnTaskRemove.Location = new System.Drawing.Point(492, 280); this.btnTaskRemove.Name = "btnTaskRemove"; this.btnTaskRemove.Size = new System.Drawing.Size(30, 26); this.btnTaskRemove.Text = "-"; this.btnTaskRemove.UseVisualStyleBackColor = true;
+            this.btnTaskUp.Location = new System.Drawing.Point(492, 314); this.btnTaskUp.Name = "btnTaskUp"; this.btnTaskUp.Size = new System.Drawing.Size(30, 26); this.btnTaskUp.Text = "↑"; this.btnTaskUp.UseVisualStyleBackColor = true;
+            this.btnTaskDown.Location = new System.Drawing.Point(492, 348); this.btnTaskDown.Name = "btnTaskDown"; this.btnTaskDown.Size = new System.Drawing.Size(30, 26); this.btnTaskDown.Text = "↓"; this.btnTaskDown.UseVisualStyleBackColor = true;
 
             // ── 选中任务参数区 ──
-            this.lblTaskDetail.AutoSize = true; this.lblTaskDetail.Location = new System.Drawing.Point(14, 354); this.lblTaskDetail.Name = "lblTaskDetail"; this.lblTaskDetail.Text = "选中任务参数"; this.lblTaskDetail.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblTaskDetail.AutoSize = true; this.lblTaskDetail.Location = new System.Drawing.Point(14, 378); this.lblTaskDetail.Name = "lblTaskDetail"; this.lblTaskDetail.Text = "选中任务参数"; this.lblTaskDetail.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
 
-            this.lblFrScene.AutoSize = true; this.lblFrScene.Location = new System.Drawing.Point(14, 382); this.lblFrScene.Name = "lblFrScene"; this.lblFrScene.Text = "工程文件";
-            this.txtFrScene.Location = new System.Drawing.Point(210, 378); this.txtFrScene.Name = "txtFrScene"; this.txtFrScene.Size = new System.Drawing.Size(300, 23);
-            this.btnFrScene.Location = new System.Drawing.Point(514, 377); this.btnFrScene.Name = "btnFrScene"; this.btnFrScene.Size = new System.Drawing.Size(30, 25); this.btnFrScene.Text = "…"; this.btnFrScene.UseVisualStyleBackColor = true;
+            this.lblFrScene.AutoSize = true; this.lblFrScene.Location = new System.Drawing.Point(14, 406); this.lblFrScene.Name = "lblFrScene"; this.lblFrScene.Text = "工程文件";
+            this.txtFrScene.Location = new System.Drawing.Point(210, 402); this.txtFrScene.Name = "txtFrScene"; this.txtFrScene.Size = new System.Drawing.Size(300, 23);
+            this.btnFrScene.Location = new System.Drawing.Point(514, 401); this.btnFrScene.Name = "btnFrScene"; this.btnFrScene.Size = new System.Drawing.Size(30, 25); this.btnFrScene.Text = "…"; this.btnFrScene.UseVisualStyleBackColor = true;
 
-            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 414); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
-            this.txtFrOutput.Location = new System.Drawing.Point(210, 410); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(300, 23);
-            this.btnFrOutput.Location = new System.Drawing.Point(514, 409); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
+            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 438); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
+            this.txtFrOutput.Location = new System.Drawing.Point(210, 434); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(300, 23);
+            this.btnFrOutput.Location = new System.Drawing.Point(514, 433); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
 
-            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 446); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起~止)";
-            this.numFrStart.Location = new System.Drawing.Point(210, 442); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
-            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(294, 446); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~";
-            this.numFrEnd.Location = new System.Drawing.Point(312, 442); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
-            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = System.Drawing.Color.Gray; this.lblRangeCount.Location = new System.Drawing.Point(406, 446); this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧";
+            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 470); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起~止)";
+            this.numFrStart.Location = new System.Drawing.Point(210, 466); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
+            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(294, 470); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~";
+            this.numFrEnd.Location = new System.Drawing.Point(312, 466); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
+            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = System.Drawing.Color.Gray; this.lblRangeCount.Location = new System.Drawing.Point(406, 470); this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧";
 
-            this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 478); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
-            this.numMaxChunk.Location = new System.Drawing.Point(210, 474); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(110, 23);
+            this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 502); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
+            this.numMaxChunk.Location = new System.Drawing.Point(210, 498); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(110, 23);
 
-            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 510); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "无进展超时(秒)";
-            this.numFrTimeout.Location = new System.Drawing.Point(210, 506); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(110, 23);
+            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 534); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "无进展超时(秒)";
+            this.numFrTimeout.Location = new System.Drawing.Point(210, 530); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(110, 23);
 
-            this.btnFrPreview.Location = new System.Drawing.Point(210, 540); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(290, 26);
+            this.btnFrPreview.Location = new System.Drawing.Point(210, 564); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(290, 26);
             this.btnFrPreview.Text = "预览输出文件名并校验目录"; this.btnFrPreview.UseVisualStyleBackColor = true;
 
             // panelLog

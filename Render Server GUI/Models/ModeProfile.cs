@@ -119,12 +119,17 @@ namespace RenderServerGui.Models
                 });
                 return;
             }
-            // 已有任务：补齐缺失主键（≤0 视为旧版数据），按现有最大值递增
+            // 已有任务：补齐缺失主键（≤0 视为旧版数据），按现有最大值递增；到达 int 上限则停止补号（后续由 UI 上限拦截）
             int max = 0;
             foreach (var t in Tasks) if (t.TaskId > max) max = t.TaskId;
             foreach (var t in Tasks)
             {
-                if (t.TaskId <= 0) { max++; t.TaskId = max; }
+                if (t.TaskId <= 0)
+                {
+                    if (max >= int.MaxValue) break;
+                    max++;
+                    t.TaskId = max;
+                }
             }
         }
 

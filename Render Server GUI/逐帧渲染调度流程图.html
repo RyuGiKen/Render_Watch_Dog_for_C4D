@@ -87,7 +87,7 @@
   <h2 class="c4d">②③ Cinema 4D.exe ／ Commandline.exe（共用代码 · 多任务队列 · 外层/内层）</h2>
   <div class="diff">同一段代码，只是 exe 与崩溃路径不同。<b>唯一信号差别：Commandline 无窗口 → 不检测「无响应」</b>。<b>三层循环</b>：最外层按队列顺序切任务，中层游标逐块推进，内层观察单个进程。块 <code>[a,b]</code> = 从游标起连续 <code>N</code> 帧（夹到任务末帧）；N=1 即单帧。挂起判活＝<b>无进展超时(默认600s)内无新帧落定</b>（每任务可独立设置）。</div>
   <div class="params">
-    <span>任务间冷却 <b>60s</b>(=帧间冷却)</span><span>最大分块长度 N <b>1</b>(≥1，夹到范围·按任务)</span><span>检查间隔 <b>30s</b></span><span>落定需距写入≥帧间冷却 <b>60s</b></span><span>启动前空载冷却按结果 <b>1/30/60s</b></span>
+    <span>任务数上限 <b>99</b></span><span>任务间冷却 <b>60s</b>(=帧间冷却)</span><span>最大分块长度 N <b>1</b>(≥1，夹到范围·按任务)</span><span>检查间隔 <b>30s</b></span><span>落定需距写入≥帧间冷却 <b>60s</b></span><span>启动前空载冷却按结果 <b>1/30/60s</b></span>
     <span>无进展判挂起 <b>600s</b>(按任务)</span><span>最大异常次数 <b>5</b></span><span>帧最大失败次数 <b>4</b></span><span>崩溃时窗 <b>30×6.5=195s</b></span>
   </div>
 
@@ -95,6 +95,7 @@
     <div class="row"><span class="node layer">【最外层 · 任务队列】</span> <span class="tag">按列表顺序串行；工程/模板/帧范围/分块N/无进展超时随任务切换，其余全局共用</span></div>
     <div class="branch">
       <div class="row"><span class="edge e-sig">取任务</span><span class="node">第 k 个任务（如 <code>任务001  scene1 [0-100]</code>，主键添加时分配、删除不回收）</span></div>
+      <div class="row"><span class="edge e-sig">添加限制</span><span class="node">任务数上限 <b>99</b> 个（启动校验同样拦截）；主键达 int 上限(2147483647)同理——达到即<b>拒绝添加并弹窗提示</b>（防护，正常用不到）</span></div>
       <div class="row"><span class="edge e-cool">k&gt;1 → 先等任务间冷却 = 帧间冷却 <b>60s</b>（首个任务直接开始）</span><span class="node ok">装载任务参数 → 进入【外层·逐块】</span></div>
       <div class="row"><span class="edge e-sig">任务结束（完成 / 熔断跳过）</span><span class="node dec">还有下一任务？</span><span class="edge e-now">是 → 取下一任务</span><span class="edge e-now">否 → 全部结束</span></div>
       <div class="row"><span class="edge e-kill">用户停止</span><span class="node bad">终止整场（后续任务不再执行）</span></div>
