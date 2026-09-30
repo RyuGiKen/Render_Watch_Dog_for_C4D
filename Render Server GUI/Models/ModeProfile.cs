@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RenderServerGui.Models
 {
@@ -84,6 +85,49 @@ namespace RenderServerGui.Models
         /// <summary>达到帧最大失败次数后对失败帧的处理策略。</summary>
         public OnFailBehaviour OnFail { get; set; }
 
+        // ---------- 多任务队列（C4D / Commandline 专用）----------
+
+        /// <summary>
+        /// 渲染任务列表，按顺序串行执行。
+        /// 旧配置文件无此节点时 Load() 会从上面6个旧字段自动迁移生成一条。
+        /// </summary>
+        public List<RenderTask> Tasks { get; set; }
+
+        /// <summary>
+        /// 从旧的单任务字段迁移到 Tasks 列表（仅当 Tasks 为 null/空 且旧字段有值时）；
+        /// 已有任务时兜底补齐缺失主键（旧版配置无 TaskId 字段，反序列化得 0）。
+        /// </summary>
+        public void MigrateToTasks()
+        {
+            if (Tasks == null) Tasks = new List<RenderTask>();
+            if (Tasks.Count == 0)
+            {
+                if (string.IsNullOrWhiteSpace(SceneFile) && string.IsNullOrWhiteSpace(OutputTemplate))
+                {
+                    Tasks.Add(RenderTask.CreateDefault());
+                    return;
+                }
+                Tasks.Add(new RenderTask
+                {
+                    TaskId = 1,
+                    SceneFile = SceneFile,
+                    OutputTemplate = OutputTemplate,
+                    StartFrame = StartFrame,
+                    EndFrame = EndFrame,
+                    MaxChunkLength = MaxChunkLength,
+                    FrameTimeoutSeconds = FrameTimeoutSeconds
+                });
+                return;
+            }
+            // 已有任务：补齐缺失主键（≤0 视为旧版数据），按现有最大值递增
+            int max = 0;
+            foreach (var t in Tasks) if (t.TaskId > max) max = t.TaskId;
+            foreach (var t in Tasks)
+            {
+                if (t.TaskId <= 0) { max++; t.TaskId = max; }
+            }
+        }
+
         /// <summary>
         /// 按模式返回一套默认可用参数（对应三组已知路径）。
         /// </summary>
@@ -129,6 +173,16 @@ namespace RenderServerGui.Models
                     profile.ProcessName = "Cinema 4D";
                     profile.ReportPath = roaming + @"\Maxon Cinema 4D 2026_1ABCDC12\_bugreports\_BugReport.txt";
                     profile.SceneFile = @"D:\Proj\scene.c4d";
+                    profile.Tasks = new List<RenderTask> { new RenderTask
+                    {
+                        TaskId = 1,
+                        SceneFile = @"D:\Proj\scene.c4d",
+                        OutputTemplate = profile.OutputTemplate,
+                        StartFrame = profile.StartFrame,
+                        EndFrame = profile.EndFrame,
+                        MaxChunkLength = profile.MaxChunkLength,
+                        FrameTimeoutSeconds = profile.FrameTimeoutSeconds
+                    }};
                     break;
 
                 case RenderMode.Commandline:
@@ -136,6 +190,16 @@ namespace RenderServerGui.Models
                     profile.ProcessName = "Commandline";
                     profile.ReportPath = roaming + @"\Maxon Cinema 4D 2026_1ABCDC12_X\_bugreports\_BugReport.txt";
                     profile.SceneFile = @"D:\Proj\scene.c4d";
+                    profile.Tasks = new List<RenderTask> { new RenderTask
+                    {
+                        TaskId = 1,
+                        SceneFile = @"D:\Proj\scene.c4d",
+                        OutputTemplate = profile.OutputTemplate,
+                        StartFrame = profile.StartFrame,
+                        EndFrame = profile.EndFrame,
+                        MaxChunkLength = profile.MaxChunkLength,
+                        FrameTimeoutSeconds = profile.FrameTimeoutSeconds
+                    }};
                     break;
             }
 

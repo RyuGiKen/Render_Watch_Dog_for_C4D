@@ -22,9 +22,14 @@ namespace RenderServerGui.UI
         /// <summary>UI 是否已就绪（就绪前忽略模式/语言切换事件以免覆盖初值）。</summary>
         private bool _uiReady;
         /// <summary>语言下拉对应的语言码（与 Items 同序）。</summary>
-        private readonly System.Collections.Generic.List<string> _langCodes = new System.Collections.Generic.List<string>();
+        private readonly List<string> _langCodes = new List<string>();
         /// <summary>最近一次运行状态，切换语言时据此刷新状态文字。</summary>
         private RunnerStatus _lastStatus = RunnerStatus.Stopped;
+
+        /// <summary>当前帧模式的任务列表引用（直接操作 profile.Tasks）。</summary>
+        private List<RenderTask> _tasks;
+        /// <summary>是否正在程序性刷新 ListBox（抑制 SelectedIndexChanged 回写）。</summary>
+        private bool _suppressTaskSelect;
 
         /// <summary>初始化窗体：装配语言与数值范围、事件，载入配置并应用界面语言。</summary>
         public MainForm()
@@ -76,7 +81,7 @@ namespace RenderServerGui.UI
             num.ThousandsSeparator = false;
         }
 
-        /// <summary>集中订阅界面事件（模式切换、按钮、路径浏览、帧范围刷新、关闭）。</summary>
+        /// <summary>集中订阅界面事件。</summary>
         private void WireEvents()
         {
             cmbMode.SelectedIndexChanged += (s, e) => OnModeChanged();
@@ -97,10 +102,25 @@ namespace RenderServerGui.UI
             numFrEnd.ValueChanged += (s, e) => UpdateRangeCount();
             cmbLang.SelectedIndexChanged += (s, e) => OnLanguageChanged();
 
+            // 编辑区任一参数变化：写回配置并即时刷新列表项显示
+            txtFrScene.TextChanged += (s, e) => OnTaskEditChanged();
+            txtFrOutput.TextChanged += (s, e) => OnTaskEditChanged();
+            numFrStart.ValueChanged += (s, e) => OnTaskEditChanged();
+            numFrEnd.ValueChanged += (s, e) => OnTaskEditChanged();
+            numMaxChunk.ValueChanged += (s, e) => OnTaskEditChanged();
+            numFrTimeout.ValueChanged += (s, e) => OnTaskEditChanged();
+
+            // 任务队列按钮
+            btnTaskAdd.Click += (s, e) => OnTaskAdd();
+            btnTaskRemove.Click += (s, e) => OnTaskRemove();
+            btnTaskUp.Click += (s, e) => OnTaskMove(-1);
+            btnTaskDown.Click += (s, e) => OnTaskMove(1);
+            lstTasks.SelectedIndexChanged += (s, e) => OnTaskSelected();
+
             FormClosing += OnFormClosingHandler;
         }
 
-        /// <summary>刷新"帧范围"右侧的帧数量显示（只读，随起止帧自动更新；结束小于起始则显示 0）。</summary>
+        /// <summary>刷新"帧范围"右侧的帧数量显示。</summary>
         private void UpdateRangeCount()
         {
             long n = (long)numFrEnd.Value - (long)numFrStart.Value + 1;
@@ -110,7 +130,7 @@ namespace RenderServerGui.UI
 
         // ---------- 多语言 ----------
 
-        /// <summary>用扫描到的语言填充下拉（各语言显示其本名，不随界面语言变）。</summary>
+        /// <summary>用扫描到的语言填充下拉。</summary>
         private void BuildLanguageMenu()
         {
             _langCodes.Clear();
@@ -129,7 +149,7 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>语言下拉切换：应用并持久化所选语言。</summary>
+        /// <summary>语言下拉切换。</summary>
         private void OnLanguageChanged()
         {
             if (!_uiReady) return;
@@ -142,7 +162,7 @@ namespace RenderServerGui.UI
             ApplyLanguage();
         }
 
-        /// <summary>把界面所有可见文字按当前语言重设；下拉项重填并保留选择。</summary>
+        /// <summary>把界面所有可见文字按当前语言重设。</summary>
         private void ApplyLanguage()
         {
             Text = Localizer.T("ui.title", "Render Server GUI");
@@ -170,32 +190,40 @@ namespace RenderServerGui.UI
             lblTrRest.Text = Localizer.T("ui.restMin", "休息时长(分)");
             chkTrClearCache.Text = Localizer.T("ui.clearCache", "启动前清空缓存目录");
 
-            // 单帧分组
+            // 单帧分组 - 全局
             grpFrame.Text = Localizer.T("ui.frGroup", "单帧调度参数");
             lblFrExe.Text = Localizer.T("ui.exe", "主程序路径");
             lblFrProc.Text = Localizer.T("ui.proc", "进程名称");
             lblFrReport.Text = Localizer.T("ui.report", "异常记录文件");
-            lblFrScene.Text = Localizer.T("ui.scene", "工程文件");
-            lblFrOutput.Text = Localizer.T("ui.output", "输出模板");
-            lblFrStart.Text = Localizer.T("ui.range", "帧范围(起~止)");
-            lblMaxChunk.Text = Localizer.T("ui.maxChunk", "最大分块长度");
             lblFrCooldown.Text = Localizer.T("ui.cooldown", "帧间冷却(秒)");
-            lblFrTimeout.Text = Localizer.T("ui.noProgressTimeout", "无进展超时(秒)");
             lblFrInterval.Text = Localizer.T("ui.checkInterval", "检查间隔(秒)");
             lblFrRetry.Text = Localizer.T("ui.maxAbnormal", "最大异常次数");
-            lblFrFail.Text = Localizer.T("ui.maxFail", "帧最大失败次数");
+            lblFrFail.Text = Localizer.T("ui.maxFail", "帧最大失败");
             lblFrOnFail.Text = Localizer.T("ui.onFail", "失败时");
             RebuildCombo(cmbFrOnFail, new[]
             {
                 Localizer.T("ui.onFailStop", "停止并告警"),
                 Localizer.T("ui.onFailSkip", "跳过继续")
             });
+
+            // 单帧分组 - 任务
+            lblTaskList.Text = Localizer.T("ui.taskList", "任务队列");
+            btnTaskAdd.Text = Localizer.T("ui.taskAdd", "添加");
+            btnTaskRemove.Text = Localizer.T("ui.taskRemove", "删除");
+            lblTaskDetail.Text = Localizer.T("ui.taskDetail", "选中任务参数");
+            lblFrScene.Text = Localizer.T("ui.scene", "工程文件");
+            lblFrOutput.Text = Localizer.T("ui.output", "输出模板");
+            lblFrStart.Text = Localizer.T("ui.range", "帧范围(起~止)");
+            lblMaxChunk.Text = Localizer.T("ui.maxChunk", "最大分块长度");
+            lblFrTimeout.Text = Localizer.T("ui.noProgressTimeout", "无进展超时(秒)");
             btnFrPreview.Text = Localizer.T("ui.preview", "预览输出文件名并校验目录");
             lblLogTitle.Text = Localizer.T("ui.logTitle", "运行日志");
             btnClearLog.Text = Localizer.T("ui.clearLog", "清空日志");
 
             SetStatusText();
             UpdateRangeCount();
+            CommitTaskFromUi(); // 语言切换会重建列表，先把编辑中的参数写回，避免旧值回显
+            RefreshTaskList();
         }
 
         /// <summary>按当前语言与最近状态刷新状态文字。</summary>
@@ -223,7 +251,6 @@ namespace RenderServerGui.UI
 
         // ---------- 模式 <-> 索引 ----------
 
-        /// <summary>模式 → 下拉框索引。</summary>
         private static int ModeToIndex(RenderMode mode)
         {
             switch (mode)
@@ -234,7 +261,6 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>下拉框索引 → 模式。</summary>
         private static RenderMode IndexToMode(int index)
         {
             switch (index)
@@ -245,13 +271,11 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>是否为单帧/分块模式（Cinema 4D 或 Commandline）。</summary>
         private static bool IsFrameMode(RenderMode mode)
             => mode == RenderMode.Cinema4D || mode == RenderMode.Commandline;
 
         // ---------- 配置 <-> UI ----------
 
-        /// <summary>从磁盘载入配置并灌入界面。</summary>
         private void LoadConfigIntoUi()
         {
             _cfg = AppConfig.Load();
@@ -259,12 +283,10 @@ namespace RenderServerGui.UI
             ApplyModeToUi(_cfg.Mode);
         }
 
-        /// <summary>模式下拉切换：先提交旧模式编辑，再载入新模式参数。</summary>
         private void OnModeChanged()
         {
             if (!_uiReady) return;
-            // 先把当前界面值写回旧模式配置，避免编辑丢失
-            CommitCurrentProfile();
+            CommitAll();
             _cfg.Mode = IndexToMode(cmbMode.SelectedIndex);
             ApplyModeToUi(_cfg.Mode);
         }
@@ -280,21 +302,31 @@ namespace RenderServerGui.UI
             ModeProfile p = _cfg.ProfileOf(mode);
             if (frame)
             {
+                // 全局参数
                 txtFrExe.Text = p.ExePath;
-                txtFrScene.Text = p.SceneFile;
                 txtFrProc.Text = p.ProcessName;
                 txtFrReport.Text = p.ReportPath;
-                txtFrOutput.Text = p.OutputTemplate;
-                numFrStart.Value = Clamp(p.StartFrame, numFrStart);
-                numFrEnd.Value = Clamp(p.EndFrame, numFrEnd);
                 numFrCooldown.Value = Clamp(p.CooldownSeconds, numFrCooldown);
-                numFrTimeout.Value = Clamp(p.FrameTimeoutSeconds, numFrTimeout);
                 numFrInterval.Value = Clamp(p.FrameCheckIntervalSeconds, numFrInterval);
                 numFrRetry.Value = Clamp(p.MaxAbnormalCount, numFrRetry);
                 numFrFail.Value = Clamp(p.MaxFrameFailCount, numFrFail);
-                numMaxChunk.Value = Clamp(p.MaxChunkLength, numMaxChunk);
                 cmbFrOnFail.SelectedIndex = p.OnFail == OnFailBehaviour.Stop ? 0 : 1;
-                UpdateRangeCount();
+
+                // 任务列表
+                _tasks = p.Tasks;
+                if (_tasks == null) { _tasks = new List<RenderTask>(); p.Tasks = _tasks; }
+                RefreshTaskList();
+                if (lstTasks.Items.Count > 0)
+                {
+                    _suppressTaskSelect = true;
+                    lstTasks.SelectedIndex = 0;
+                    _suppressTaskSelect = false;
+                    LoadTaskToUi(0);
+                }
+                else
+                {
+                    SetTaskDetailEnabled(false);
+                }
             }
             else
             {
@@ -311,7 +343,6 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>把整数值夹到某 NumericUpDown 的 [Min,Max]，用于安全赋值。</summary>
         private static decimal Clamp(int v, NumericUpDown num)
         {
             if (v < (int)num.Minimum) return num.Minimum;
@@ -319,8 +350,182 @@ namespace RenderServerGui.UI
             return v;
         }
 
-        /// <summary>把当前界面值写回当前模式的配置对象。</summary>
-        private void CommitCurrentProfile()
+        // ---------- 任务队列 UI ----------
+
+        /// <summary>刷新 ListBox 显示内容并保留选中。</summary>
+        private void RefreshTaskList()
+        {
+            if (_tasks == null) return;
+            int sel = lstTasks.SelectedIndex;
+            _suppressTaskSelect = true;
+            lstTasks.BeginUpdate();
+            lstTasks.Items.Clear();
+            for (int i = 0; i < _tasks.Count; i++)
+                lstTasks.Items.Add($"{i + 1}.{_tasks[i].DisplayLabel}");
+            if (sel >= 0 && sel < lstTasks.Items.Count) lstTasks.SelectedIndex = sel;
+            else if (lstTasks.Items.Count > 0) lstTasks.SelectedIndex = 0;
+            lstTasks.EndUpdate();
+            _suppressTaskSelect = false;
+            UpdateTaskButtons();
+        }
+
+        /// <summary>按选中状态启用/禁用任务操作按钮。</summary>
+        private void UpdateTaskButtons()
+        {
+            int sel = lstTasks.SelectedIndex;
+            bool has = sel >= 0;
+            btnTaskRemove.Enabled = has;
+            btnTaskUp.Enabled = has && sel > 0;
+            btnTaskDown.Enabled = has && sel < lstTasks.Items.Count - 1;
+            SetTaskDetailEnabled(has);
+        }
+
+        /// <summary>启用/禁用选中任务编辑区控件。</summary>
+        private void SetTaskDetailEnabled(bool enabled)
+        {
+            txtFrScene.Enabled = enabled;
+            btnFrScene.Enabled = enabled;
+            txtFrOutput.Enabled = enabled;
+            btnFrOutput.Enabled = enabled;
+            numFrStart.Enabled = enabled;
+            numFrEnd.Enabled = enabled;
+            numMaxChunk.Enabled = enabled;
+            numFrTimeout.Enabled = enabled;
+            btnFrPreview.Enabled = enabled;
+        }
+
+        /// <summary>ListBox 选中变化：先提交旧选中项编辑，再加载新选中项。</summary>
+        private void OnTaskSelected()
+        {
+            if (_suppressTaskSelect || !_uiReady) return;
+            // 提交前一个任务的编辑（通过 Tag 记住上次选中）
+            CommitTaskFromUi();
+            int idx = lstTasks.SelectedIndex;
+            if (idx >= 0 && idx < _tasks.Count)
+                LoadTaskToUi(idx);
+            UpdateTaskButtons();
+        }
+
+        /// <summary>把指定索引的任务参数加载到 UI 控件。</summary>
+        private void LoadTaskToUi(int idx)
+        {
+            if (_tasks == null || idx < 0 || idx >= _tasks.Count) return;
+            var t = _tasks[idx];
+            _suppressTaskSelect = true;
+            txtFrScene.Text = t.SceneFile ?? string.Empty;
+            txtFrOutput.Text = t.OutputTemplate ?? string.Empty;
+            numFrStart.Value = Clamp(t.StartFrame, numFrStart);
+            numFrEnd.Value = Clamp(t.EndFrame, numFrEnd);
+            numMaxChunk.Value = Clamp(t.MaxChunkLength, numMaxChunk);
+            numFrTimeout.Value = Clamp(t.FrameTimeoutSeconds, numFrTimeout);
+            _suppressTaskSelect = false;
+            UpdateRangeCount();
+            lstTasks.Tag = idx; // 记住当前加载的索引
+        }
+
+        /// <summary>把 UI 控件值写回当前选中的任务对象。</summary>
+        private void CommitTaskFromUi()
+        {
+            if (_tasks == null) return;
+            int idx = lstTasks.Tag is int ti ? ti : lstTasks.SelectedIndex;
+            if (idx < 0 || idx >= _tasks.Count) return;
+            var t = _tasks[idx];
+            t.SceneFile = txtFrScene.Text.Trim();
+            t.OutputTemplate = txtFrOutput.Text.Trim();
+            t.StartFrame = (int)numFrStart.Value;
+            t.EndFrame = (int)numFrEnd.Value;
+            t.MaxChunkLength = (int)numMaxChunk.Value;
+            t.FrameTimeoutSeconds = (int)numFrTimeout.Value;
+        }
+
+        /// <summary>
+        /// 编辑区参数变化：立即写回当前选中任务（内存配置），并同步刷新列表项显示。
+        /// 程序性赋值（LoadTaskToUi 等）经 _suppressTaskSelect 抑制，不触发。
+        /// </summary>
+        private void OnTaskEditChanged()
+        {
+            if (_suppressTaskSelect || !_uiReady) return;
+            CommitTaskFromUi();
+            int idx = lstTasks.Tag is int ti ? ti : lstTasks.SelectedIndex;
+            if (_tasks == null || idx < 0 || idx >= _tasks.Count) return;
+            _suppressTaskSelect = true;
+            lstTasks.Items[idx] = $"{idx + 1}.{_tasks[idx].DisplayLabel}";
+            _suppressTaskSelect = false;
+        }
+
+        /// <summary>添加任务：复制当前选中项（或空白）追加到末尾并选中；主键=现有最大值+1（删除不回收）。</summary>
+        private void OnTaskAdd()
+        {
+            if (_tasks == null) return;
+            CommitTaskFromUi();
+            RenderTask newTask;
+            int sel = lstTasks.SelectedIndex;
+            if (sel >= 0 && sel < _tasks.Count)
+                newTask = _tasks[sel].Clone();
+            else
+                newTask = RenderTask.CreateDefault();
+            int maxId = 0;
+            foreach (var t in _tasks) { if (t.TaskId > maxId) maxId = t.TaskId; }
+            newTask.TaskId = maxId + 1;
+            _tasks.Add(newTask);
+            int newIdx = _tasks.Count - 1;
+            LoadTaskToUi(newIdx);   // 先同步编辑区与 Tag，再改选中，防错位提交
+            RefreshTaskList();
+            lstTasks.SelectedIndex = newIdx;
+            UpdateTaskButtons();
+        }
+
+        /// <summary>删除选中任务。</summary>
+        private void OnTaskRemove()
+        {
+            if (_tasks == null) return;
+            int sel = lstTasks.SelectedIndex;
+            if (sel < 0 || sel >= _tasks.Count) return;
+            lstTasks.Tag = -1; // 编辑区数据即将失效，抑制结构性操作期间的错位提交
+            _tasks.RemoveAt(sel);
+            RefreshTaskList();
+            if (_tasks.Count > 0)
+            {
+                int newSel = Math.Min(sel, _tasks.Count - 1);
+                LoadTaskToUi(newSel);
+                lstTasks.SelectedIndex = newSel;
+            }
+            else
+            {
+                SetTaskDetailEnabled(false);
+            }
+            UpdateTaskButtons();
+        }
+
+        /// <summary>上移/下移选中任务。delta=-1 上移，+1 下移。</summary>
+        private void OnTaskMove(int delta)
+        {
+            if (_tasks == null) return;
+            int sel = lstTasks.SelectedIndex;
+            int target = sel + delta;
+            if (sel < 0 || target < 0 || target >= _tasks.Count) return;
+            CommitTaskFromUi();
+            var tmp = _tasks[sel];
+            _tasks[sel] = _tasks[target];
+            _tasks[target] = tmp;
+            LoadTaskToUi(target);   // 先同步编辑区与 Tag 到新位置，防错位提交
+            RefreshTaskList();
+            lstTasks.SelectedIndex = target;
+            UpdateTaskButtons();
+        }
+
+        // ---------- 提交与校验 ----------
+
+        /// <summary>提交当前模式的全部编辑（全局+任务）到配置对象。</summary>
+        private void CommitAll()
+        {
+            CommitGlobalProfile();
+            if (IsFrameMode(_cfg.Mode))
+                CommitTaskFromUi();
+        }
+
+        /// <summary>把全局参数控件值写回当前模式的 ModeProfile。</summary>
+        private void CommitGlobalProfile()
         {
             RenderMode mode = _cfg.Mode;
             ModeProfile p = _cfg.ProfileOf(mode) ?? ModeProfile.ForPreset(mode);
@@ -328,19 +533,15 @@ namespace RenderServerGui.UI
             if (IsFrameMode(mode))
             {
                 p.ExePath = txtFrExe.Text.Trim();
-                p.SceneFile = txtFrScene.Text.Trim();
                 p.ProcessName = txtFrProc.Text.Trim();
                 p.ReportPath = txtFrReport.Text.Trim();
-                p.OutputTemplate = txtFrOutput.Text.Trim();
-                p.StartFrame = (int)numFrStart.Value;
-                p.EndFrame = (int)numFrEnd.Value;
                 p.CooldownSeconds = (int)numFrCooldown.Value;
-                p.FrameTimeoutSeconds = (int)numFrTimeout.Value;
                 p.FrameCheckIntervalSeconds = (int)numFrInterval.Value;
                 p.MaxAbnormalCount = (int)numFrRetry.Value;
                 p.MaxFrameFailCount = (int)numFrFail.Value;
-                p.MaxChunkLength = (int)numMaxChunk.Value;
                 p.OnFail = cmbFrOnFail.SelectedIndex == 1 ? OnFailBehaviour.Skip : OnFailBehaviour.Stop;
+                // 同步任务列表引用
+                if (_tasks != null) p.Tasks = _tasks;
             }
             else
             {
@@ -364,7 +565,7 @@ namespace RenderServerGui.UI
         /// <summary>启动：提交并校验参数、落盘、按模式建控制器并启动。</summary>
         private void StartCurrent()
         {
-            CommitCurrentProfile();
+            CommitAll();
 
             ModeProfile p = _cfg.ProfileOf(_cfg.Mode);
             if (!ValidateProfile(p, out string err))
@@ -374,7 +575,7 @@ namespace RenderServerGui.UI
                 return;
             }
 
-            _cfg.Save(out _); // 启动前落盘一份
+            _cfg.Save(out _);
 
             _controller = IsFrameMode(_cfg.Mode)
                 ? (IRenderController)new FrameRenderController()
@@ -389,7 +590,7 @@ namespace RenderServerGui.UI
             _controller.Start(p);
         }
 
-        /// <summary>首次启动前发现同名进程：在 UI 线程弹窗询问“杀残留再启动 / 停止队列”，返回决策。由后台线程经 Invoke 调来。</summary>
+        /// <summary>首次启动前发现同名进程：在 UI 线程弹窗询问。</summary>
         private PreexistingChoice AskPreexisting(int count)
         {
             if (InvokeRequired)
@@ -397,7 +598,7 @@ namespace RenderServerGui.UI
 
             string name = _cfg.ProfileOf(_cfg.Mode)?.ProcessName ?? "渲染";
             string body = Localizer.Tf("dlg.preexistBody",
-                "检测到已有 {0} 个「{1}」进程在运行。\n\n选“是”＝结束这些残留进程后再开始队列；\n选“否”＝停止本次调度（不启动、也不动这些进程）。",
+                "检测到已有 {0} 个「{1}」进程在运行。\n\n选\"是\"＝结束这些残留进程后再开始队列；\n选\"否\"＝停止本次调度（不启动、也不动这些进程）。",
                 count, name);
             var r = MessageBox.Show(this, body,
                 Localizer.T("dlg.preexistTitle", "已存在渲染进程"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
@@ -405,16 +606,13 @@ namespace RenderServerGui.UI
             return r == DialogResult.Yes ? PreexistingChoice.KillAndStart : PreexistingChoice.Abort;
         }
 
-        /// <summary>请求停止当前控制器。</summary>
         private void StopCurrent()
         {
             if (_controller != null && _controller.IsRunning)
-            {
                 _controller.Stop();
-            }
         }
 
-        /// <summary>校验参数是否可启动，返回是否通过并给出错误文本。</summary>
+        /// <summary>校验参数是否可启动。</summary>
         private bool ValidateProfile(ModeProfile p, out string error)
         {
             error = null;
@@ -425,19 +623,26 @@ namespace RenderServerGui.UI
 
             if (IsFrameMode(_cfg.Mode))
             {
-                if (string.IsNullOrWhiteSpace(p.SceneFile)) { error = Localizer.T("msg.badScene", "工程文件为空。"); return false; }
-                if (p.StartFrame > p.EndFrame) { error = Localizer.T("msg.badRange", "起始帧不能大于结束帧。"); return false; }
-                if (string.IsNullOrWhiteSpace(p.OutputTemplate)) { error = Localizer.T("msg.templateEmpty", "输出模板为空。"); return false; }
-                if (!Regex_HasToken(p.OutputTemplate)) { error = Localizer.T("msg.templateNoToken", "输出模板缺少帧号占位符，应形如 Image_****.png（星号个数=补零位数）。"); return false; }
+                if (p.Tasks == null || p.Tasks.Count == 0)
+                {
+                    error = Localizer.T("msg.noTasks", "任务队列为空，请至少添加一个任务。");
+                    return false;
+                }
+                for (int i = 0; i < p.Tasks.Count; i++)
+                {
+                    var t = p.Tasks[i];
+                    string prefix = Localizer.Tf("msg.taskN", "任务 {0}: ", i + 1);
+                    if (string.IsNullOrWhiteSpace(t.SceneFile)) { error = prefix + Localizer.T("msg.badScene", "工程文件为空。"); return false; }
+                    if (t.StartFrame > t.EndFrame) { error = prefix + Localizer.T("msg.badRange", "起始帧不能大于结束帧。"); return false; }
+                    if (string.IsNullOrWhiteSpace(t.OutputTemplate)) { error = prefix + Localizer.T("msg.templateEmpty", "输出模板为空。"); return false; }
+                    if (!HasFrameToken(t.OutputTemplate)) { error = prefix + Localizer.T("msg.templateNoToken", "输出模板缺少帧号占位符，应形如 Image_****.png。"); return false; }
+                }
             }
             return true;
         }
 
-        /// <summary>判断输出模板是否含星号帧号占位符。</summary>
-        private static bool Regex_HasToken(string template)
-        {
-            return System.Text.RegularExpressions.Regex.IsMatch(template, @"\*+");
-        }
+        private static bool HasFrameToken(string template)
+            => System.Text.RegularExpressions.Regex.IsMatch(template, @"\*+");
 
         /// <summary>运行中禁用参数编辑与模式切换，停止后恢复。</summary>
         private void SetRunningUi(bool running)
@@ -449,30 +654,26 @@ namespace RenderServerGui.UI
             grpFrame.Enabled = !running;
         }
 
-        // ---------- 控制器事件（回主线程） ----------
+        // ---------- 控制器事件 ----------
 
-        /// <summary>控制器日志事件：转投 UI 线程追加到日志框。</summary>
         private void OnControllerLog(object sender, LogEntry entry)
         {
             if (IsDisposed) return;
             try { BeginInvoke(new Action(() => AppendLog(entry))); } catch { }
         }
 
-        /// <summary>控制器状态事件：转投 UI 线程更新状态灯。</summary>
         private void OnControllerStatus(object sender, RunnerStatus status)
         {
             if (IsDisposed) return;
             try { BeginInvoke(new Action(() => ApplyStatus(status))); } catch { }
         }
 
-        /// <summary>控制器进度事件：转投 UI 线程更新进度条。</summary>
         private void OnControllerProgress(object sender, FrameProgressInfo info)
         {
             if (IsDisposed) return;
             try { BeginInvoke(new Action(() => ApplyProgress(info))); } catch { }
         }
 
-        /// <summary>按级别着色追加一行日志，并在超限处裁剪。</summary>
         private void AppendLog(LogEntry entry)
         {
             Color color = entry.Level == LogLevel.Error ? Color.Firebrick
@@ -487,7 +688,6 @@ namespace RenderServerGui.UI
             TrimLog();
         }
 
-        // 日志上限：超过行数或字符数就裁掉最旧的一部分，避免长跑占用过多内存。
         private const int MaxLogLines = 1500;
         private const int MaxLogChars = 150000;
         private const int LogTrimKeep = 1000;
@@ -495,22 +695,17 @@ namespace RenderServerGui.UI
         private void TrimLog()
         {
             if (rtbLog.Lines.Length <= MaxLogLines && rtbLog.TextLength <= MaxLogChars) return;
-
-            // 保留末尾 LogTrimKeep 行：定位要删除的截断点（第 lines-keep 行的行首）
             int lines = rtbLog.Lines.Length;
             int keep = Math.Min(LogTrimKeep, lines / 2);
             int drop = lines - keep;
             if (drop <= 0) return;
-
             int cutIndex = rtbLog.GetFirstCharIndexFromLine(drop);
             if (cutIndex <= 0) return;
-
             rtbLog.Select(0, cutIndex);
             rtbLog.SelectedText = string.Empty;
             rtbLog.Select(rtbLog.TextLength, 0);
         }
 
-        /// <summary>按运行状态更新状态灯颜色/文字并同步按钮可用性。</summary>
         private void ApplyStatus(RunnerStatus status)
         {
             _lastStatus = status;
@@ -534,7 +729,6 @@ namespace RenderServerGui.UI
             SetStatusText();
         }
 
-        /// <summary>按进度信息更新进度条。</summary>
         private void ApplyProgress(FrameProgressInfo info)
         {
             if (info.Total <= 0) return;
@@ -553,27 +747,34 @@ namespace RenderServerGui.UI
                 return;
             }
 
-            CommitCurrentProfile();
-            ModeProfile p = _cfg.ProfileOf(_cfg.Mode);
+            CommitTaskFromUi();
+            int idx = lstTasks.SelectedIndex;
+            if (idx < 0 || _tasks == null || idx >= _tasks.Count)
+            {
+                MessageBox.Show(this, Localizer.T("msg.noTaskSelected", "请先选中一个任务。"),
+                    Localizer.T("msg.previewTitleShort", "预览输出名"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var task = _tasks[idx];
 
-            if (string.IsNullOrWhiteSpace(p.OutputTemplate))
+            if (string.IsNullOrWhiteSpace(task.OutputTemplate))
             {
                 MessageBox.Show(this, Localizer.T("msg.templateEmpty", "输出模板为空。"),
                     Localizer.T("msg.previewTitleShort", "预览输出名"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            if (!Regex_HasToken(p.OutputTemplate))
+            if (!HasFrameToken(task.OutputTemplate))
             {
                 MessageBox.Show(this, Localizer.T("msg.templateNoToken", "输出模板缺少帧号占位符，应形如 Image_****.png（星号个数=补零位数）。"),
                     Localizer.T("msg.previewTitleShort", "预览输出名"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            string startPath = FrameScanner.FramePath(p.OutputTemplate, p.StartFrame);
-            string endPath = FrameScanner.FramePath(p.OutputTemplate, p.EndFrame);
+            string startPath = FrameScanner.FramePath(task.OutputTemplate, task.StartFrame);
+            string endPath = FrameScanner.FramePath(task.OutputTemplate, task.EndFrame);
             var sb = new StringBuilder();
-            sb.AppendLine(Localizer.Tf("dlg.preStartFrame", "起始帧 {0} → {1}", p.StartFrame, startPath));
-            sb.AppendLine(Localizer.Tf("dlg.preEndFrame", "结束帧 {0} → {1}", p.EndFrame, endPath));
+            sb.AppendLine(Localizer.Tf("dlg.preStartFrame", "起始帧 {0} → {1}", task.StartFrame, startPath));
+            sb.AppendLine(Localizer.Tf("dlg.preEndFrame", "结束帧 {0} → {1}", task.EndFrame, endPath));
             sb.AppendLine();
 
             string dir = Path.GetDirectoryName(startPath);
@@ -587,7 +788,7 @@ namespace RenderServerGui.UI
             else
             {
                 sb.AppendLine(Localizer.Tf("dlg.preDir", "输出目录：{0}", dir));
-                var frames = FrameScanner.EnumerateRenderedFrames(p.OutputTemplate);
+                var frames = FrameScanner.EnumerateRenderedFrames(task.OutputTemplate);
                 if (frames.Count == 0)
                 {
                     sb.AppendLine(CountFiles(dir) > 0
@@ -596,7 +797,7 @@ namespace RenderServerGui.UI
                 }
                 else
                 {
-                    string segs = BuildFrameRanges(Path.GetFileName(p.OutputTemplate), frames);
+                    string segs = BuildFrameRanges(Path.GetFileName(task.OutputTemplate), frames);
                     sb.AppendLine(Localizer.Tf("dlg.preCount", "{0} 等 {1} 个文件", segs, frames.Count));
                 }
             }
@@ -606,7 +807,6 @@ namespace RenderServerGui.UI
 
         // ---------- 浏览对话框 ----------
 
-        /// <summary>浏览选择可执行文件（主程序）。</summary>
         private void BrowseExe(TextBox target)
         {
             using (var dlg = new OpenFileDialog())
@@ -618,7 +818,6 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>浏览选择异常记录文件（_BugReport.txt，允许不存在）。</summary>
         private void BrowseReport(TextBox target)
         {
             using (var dlg = new OpenFileDialog())
@@ -630,7 +829,6 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>浏览选择 Cinema 4D 工程文件（.c4d，允许不存在）。</summary>
         private void BrowseScene(TextBox target)
         {
             using (var dlg = new OpenFileDialog())
@@ -640,9 +838,9 @@ namespace RenderServerGui.UI
                 dlg.CheckFileExists = false;
                 TryFill(target, dlg, initialDirOf(target.Text));
             }
+            // 列表显示由 txtFrScene.TextChanged → OnTaskEditChanged 即时接手
         }
 
-        /// <summary>浏览选择文件夹并写入目标文本框。</summary>
         private void BrowseFolder(TextBox target)
         {
             using (var dlg = new FolderBrowserDialog())
@@ -653,7 +851,6 @@ namespace RenderServerGui.UI
             }
         }
 
-        /// <summary>选择输出目录，仅替换模板的目录部分、保留含占位符的文件名。</summary>
         private void BrowseOutputFolder()
         {
             using (var dlg = new FolderBrowserDialog())
@@ -661,29 +858,24 @@ namespace RenderServerGui.UI
                 string dir = initialDirOf(txtFrOutput.Text);
                 if (dir != null && Directory.Exists(dir)) dlg.SelectedPath = dir;
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
-
-                // 仅替换模板的目录部分，保留文件名（含帧号占位符）
                 string file = Path.GetFileName(txtFrOutput.Text.Trim());
                 if (string.IsNullOrEmpty(file)) file = "Image_****.png";
                 txtFrOutput.Text = Path.Combine(dlg.SelectedPath, file);
             }
         }
 
-        /// <summary>取路径的目录部分（用于设置对话框初始目录），无效返回 null。</summary>
         private static string initialDirOf(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return null;
             try { return Path.GetDirectoryName(path); } catch { return null; }
         }
 
-        /// <summary>统计目录内文件数（异常返回 0）。</summary>
         private static int CountFiles(string dir)
         {
             try { return Directory.GetFiles(dir).Length; }
             catch { return 0; }
         }
 
-        /// <summary>把升序帧号合并成连续段，替换模板占位符显示，如 Image_[0,59].png，Image_[61,100].png。</summary>
         private static string BuildFrameRanges(string template, List<int> sortedFrames)
         {
             var parts = new List<string>();
@@ -692,15 +884,13 @@ namespace RenderServerGui.UI
             {
                 bool continues = i < sortedFrames.Count && sortedFrames[i] == runPrev + 1;
                 if (continues) { runPrev = sortedFrames[i]; continue; }
-
                 string rep = runStart == runPrev ? $"[{runStart}]" : $"[{runStart},{runPrev}]";
-                parts.Add(new System.Text.RegularExpressions.Regex(@"\*+").Replace(template, rep, 1)); // 只替换首个占位段
+                parts.Add(new System.Text.RegularExpressions.Regex(@"\*+").Replace(template, rep, 1));
                 if (i < sortedFrames.Count) { runStart = sortedFrames[i]; runPrev = sortedFrames[i]; }
             }
             return string.Join("，", parts);
         }
 
-        /// <summary>打开文件对话框（可设初始目录），确定后把所选路径写入目标框。</summary>
         private void TryFill(TextBox target, OpenFileDialog dlg, string initialDir)
         {
             if (initialDir != null && Directory.Exists(initialDir)) dlg.InitialDirectory = initialDir;
@@ -710,16 +900,15 @@ namespace RenderServerGui.UI
 
         // ---------- 关闭 ----------
 
-        /// <summary>关窗前停止运行中的控制器、提交当前编辑并落盘配置。</summary>
         private void OnFormClosingHandler(object sender, FormClosingEventArgs e)
         {
             _uiReady = false;
             if (_controller != null && _controller.IsRunning)
             {
                 _controller.Stop();
-                System.Threading.Thread.Sleep(200); // 给后台线程一点时间收尾
+                System.Threading.Thread.Sleep(200);
             }
-            CommitCurrentProfile();
+            CommitAll();
             _cfg.Save(out _);
         }
     }

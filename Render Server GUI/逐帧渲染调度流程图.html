@@ -41,8 +41,8 @@
 </head>
 <body>
 <header>
-  <h1>执行逻辑 · 带时间间隔的多分支树状图（分块版）</h1>
-  <div class="sub">Cinema 4D 与 Commandline <b>共用同一段代码</b>。单帧是分块的特例（<b>最大分块长度 N=1</b>）；N≥1 且夹到任务范围，允许 N≥总帧数一次渲完。<b>续渲纯手动</b>：跨重启不留痕，由用户自查缺帧后手填范围。数值取 GUI 默认，均可改。</div>
+  <h1>执行逻辑 · 带时间间隔的多分支树状图（多任务分块版）</h1>
+  <div class="sub">Cinema 4D 与 Commandline <b>共用同一段代码</b>。<b>任务队列串行</b>：每个任务含工程文件·输出模板·帧范围·最大分块·无进展超时，其余参数全局共用。单帧是分块的特例（<b>最大分块长度 N=1</b>）；N≥1 且夹到任务范围，允许 N≥总帧数一次渲完。<b>续渲纯手动</b>：跨重启不留痕，由用户自查缺帧后手填范围。数值取 GUI 默认，均可改。</div>
 </header>
 <div class="wrap">
   <div class="legend">
@@ -83,17 +83,25 @@
     </div>
   </div>
 
-  <!-- ================= ②③ 分块，两层 ================= -->
-  <h2 class="c4d">②③ Cinema 4D.exe ／ Commandline.exe（共用代码 · 分块 · 外层/内层）</h2>
-  <div class="diff">同一段代码，只是 exe 与崩溃路径不同。<b>唯一信号差别：Commandline 无窗口 → 不检测「无响应」</b>。块 <code>[a,b]</code> = 从游标起连续 <code>N</code> 帧（夹到末帧）；N=1 即单帧。挂起判活＝<b>600s 内无新帧落定</b>（不再用"每帧总时长"）。</div>
+  <!-- ================= ②③ 分块，三层 ================= -->
+  <h2 class="c4d">②③ Cinema 4D.exe ／ Commandline.exe（共用代码 · 多任务队列 · 外层/内层）</h2>
+  <div class="diff">同一段代码，只是 exe 与崩溃路径不同。<b>唯一信号差别：Commandline 无窗口 → 不检测「无响应」</b>。<b>三层循环</b>：最外层按队列顺序切任务，中层游标逐块推进，内层观察单个进程。块 <code>[a,b]</code> = 从游标起连续 <code>N</code> 帧（夹到任务末帧）；N=1 即单帧。挂起判活＝<b>无进展超时(默认600s)内无新帧落定</b>（每任务可独立设置）。</div>
   <div class="params">
-    <span>最大分块长度 N <b>1</b>(≥1，夹到范围)</span><span>检查间隔 <b>30s</b></span><span>落定需距写入≥帧间冷却 <b>60s</b></span><span>启动前空载冷却按结果 <b>1/30/60s</b></span>
-    <span>无进展判挂起 <b>600s</b></span><span>最大异常次数 <b>5</b></span><span>帧最大失败次数 <b>4</b></span><span>崩溃时窗 <b>30×6.5=195s</b></span>
+    <span>任务间冷却 <b>60s</b>(=帧间冷却)</span><span>最大分块长度 N <b>1</b>(≥1，夹到范围·按任务)</span><span>检查间隔 <b>30s</b></span><span>落定需距写入≥帧间冷却 <b>60s</b></span><span>启动前空载冷却按结果 <b>1/30/60s</b></span>
+    <span>无进展判挂起 <b>600s</b>(按任务)</span><span>最大异常次数 <b>5</b></span><span>帧最大失败次数 <b>4</b></span><span>崩溃时窗 <b>30×6.5=195s</b></span>
   </div>
 
   <div class="tree">
-    <div class="row"><span class="node layer">【外层 · 逐块推进】</span> <span class="tag">游标只前进；跨重启不留痕</span></div>
-    <div class="row"><span class="node dec">cursor = 起始帧（重开时由用户填缺帧范围）</span></div>
+    <div class="row"><span class="node layer">【最外层 · 任务队列】</span> <span class="tag">按列表顺序串行；工程/模板/帧范围/分块N/无进展超时随任务切换，其余全局共用</span></div>
+    <div class="branch">
+      <div class="row"><span class="edge e-sig">取任务</span><span class="node">第 k 个任务（如 <code>任务001  scene1 [0-100]</code>，主键添加时分配、删除不回收）</span></div>
+      <div class="row"><span class="edge e-cool">k&gt;1 → 先等任务间冷却 = 帧间冷却 <b>60s</b>（首个任务直接开始）</span><span class="node ok">装载任务参数 → 进入【外层·逐块】</span></div>
+      <div class="row"><span class="edge e-sig">任务结束（完成 / 熔断跳过）</span><span class="node dec">还有下一任务？</span><span class="edge e-now">是 → 取下一任务</span><span class="edge e-now">否 → 全部结束</span></div>
+      <div class="row"><span class="edge e-kill">用户停止</span><span class="node bad">终止整场（后续任务不再执行）</span></div>
+    </div>
+
+    <div class="row" style="margin-top:14px;"><span class="node layer">【外层 · 逐块推进】</span> <span class="tag">游标只前进；跨重启不留痕</span></div>
+    <div class="row"><span class="node dec">cursor = 当前任务起始帧（重开时由用户填缺帧范围）</span></div>
     <div class="branch">
       <div class="row"><span class="edge e-sig">跳过已落定</span><span class="node">cursor 越过连续"已落定"帧（续渲/重叠）</span></div>
       <div class="row"><span class="edge e-sig">取块</span><span class="node">a = cursor；b = min(a+N-1, 末帧)；块 [a,b]（N=1 即 [a,a]）</span></div>
@@ -111,10 +119,10 @@
             <div class="row"><span class="edge e-sig">=4</span><span class="node bad">跳过起点帧：cursor=a+1，focusFail=0</span><span class="loop">↩ 下一块</span></div>
           </div>
         </div>
-        <div class="row"><span class="edge e-now">停止 / 进程起不来</span><span class="node bad">终止整场</span></div>
-        <div class="row"><span class="edge e-sig">熔断</span><span class="node bad">连续 ~3 块都"原地卡起点即失败" → 判资产/授权/未烘缓存类全局问题，停止并高亮（防整片被跳）</span></div>
+        <div class="row"><span class="edge e-now">停止 / 进程起不来</span><span class="node bad">终止整场（后续任务不再执行）</span></div>
+        <div class="row"><span class="edge e-sig">熔断</span><span class="node bad">连续 ~3 块都"原地卡起点即失败" → 判资产/授权/未烘缓存类全局问题，<b>跳过当前任务</b>（不再终止整场），接任务间冷却 → 下一任务</span></div>
       </div>
-      <div class="row"><span class="edge e-now">cursor&gt;末帧</span><span class="node ok">结束 · 汇总（缺帧由用户下次手填范围续渲）</span></div>
+      <div class="row"><span class="edge e-now">cursor&gt;任务末帧</span><span class="node ok">本任务结束 · 汇总（缺帧由用户下次手填范围续渲）→ 回【最外层】取下一任务</span></div>
     </div>
 
     <div class="row" style="margin-top:14px;"><span class="node layer">【内层 · 一个进程的观察】</span> 异常计数=0、记录已落定进度；启动后每 <b>30s</b> 轮询（无进程已退出的加载误判风险）：</div>
@@ -122,7 +130,7 @@
       <div class="row"><span class="edge e-wait">等待30s(可中断)</span><span class="node sig">① 收到停止 → <span class="k-bad">杀进程树</span> → 返回「停止」</span></div>
       <div class="row"><span class="edge e-sig">② 块内全部落定？</span><span class="node">是 → 若进程还在则<span class="k-warn">杀</span>「渲完未退出」，否则正常退出 → <span class="k-ok">返回「成功」</span></span></div>
       <div class="row"><span class="edge e-sig">③ 有新帧落定？</span><span class="node">是 → 重置「无进展计时」，视为有进展</span></div>
-      <div class="row"><span class="edge e-sig">④ 崩溃报告在195s时窗内 或 进程已退出但块未全落定 或 600s无新帧落定？</span><span class="node bad">是 → 异常计数 +1（X/5）；<b>=5 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b></span></div>
+      <div class="row"><span class="edge e-sig">④ 崩溃报告在195s时窗内 或 进程已退出但块未全落定 或 无进展超时(按任务,默认600s)内无新帧落定？</span><span class="node bad">是 → 异常计数 +1（X/5）；<b>=5 → <span class="k-bad">杀进程树</span> 返回「尝试失败」</b></span></div>
       <div class="row"><span class="edge e-sig">⑤ 已退出且块内已有部分落定</span><span class="node">立即 <span class="k-warn">返回「尝试失败」</span>（外层前进到缺口续渲，不空等去抖）</span></div>
       <div class="row"><span class="edge e-sig">⑥ 仅无响应(未无进展超时)</span><span class="node"><b>仅Cinema4D可观测，Commandline恒跳过</b>；只提示一次，异常计数<span class="k-ok">清零</span> → 等下一tick</span></div>
       <div class="row"><span class="edge e-now">⑦ 以上都不成立(正常推进)</span><span class="node ok">异常计数保持/清零 → 等下一tick</span></div>
@@ -149,12 +157,14 @@
 
   <h2 class="dv">关键要点</h2>
   <div class="tree" style="font-size:13px;">
+    <div class="row">• <b>多任务队列：</b>C4D / Commandline 每模式一组任务，<b>严格按列表顺序串行</b>；任务间先等帧间冷却(60s)再启动下一任务。任务主键(如 任务001)添加时按现有最大值+1 分配、删除不回收。</div>
     <div class="row">• <b>统一模型：</b>N=1 退化为单帧（块=[a,a]），单帧/分块同一套代码。</div>
-    <div class="row">• <b>挂起：</b>由"每帧总超时"改为<b>600s 无新帧落定</b>；块多长都不误杀，块内卡死也能及时抓。无响应仍只提示、不杀（Commandline 无窗口自动跳过）。</div>
+    <div class="row">• <b>挂起：</b>由"每帧总超时"改为<b>无进展超时（按任务设置，默认600s）无新帧落定</b>；块多长都不误杀，块内卡死也能及时抓。无响应仍只提示、不杀（Commandline 无窗口自动跳过）。</div>
     <div class="row">• <b>报错(崩溃报告)：</b>195s 时窗命中即+1、达最大异常次数(5)才杀、出窗清零——与①同款去抖。</div>
-    <div class="row">• <b>推进/跳过：</b>前进就重置焦点失败计数；原地卡满帧最大失败(4)才跳起点帧，游标只前进不留内部洞；跨重启不留痕、用户手填范围。连续3块原地即失败→熔断停止。</div>
-    <div class="row">• <b>冷却：</b>每块启动前空载冷却(无渲染)；块内 N 帧连渲无冷却，N 越大越省加载也越积热。</div>
-    <div class="row">• <b>范围夹取：</b>所有帧号/块端点自动夹进 [起始帧, 结束帧]，N 允许 ≥ 总帧数一次渲完。</div>
+    <div class="row">• <b>推进/跳过：</b>前进就重置焦点失败计数；原地卡满帧最大失败(4)才跳起点帧，游标只前进不留内部洞；跨重启不留痕、用户手填范围。</div>
+    <div class="row">• <b>熔断：</b>连续3块原地即失败→判全局问题，<b>跳过当前任务继续下一任务</b>（不再终止整场）；「停止」操作仍是终止整场。</div>
+    <div class="row">• <b>冷却：</b>每块启动前空载冷却(无渲染)；块内 N 帧连渲无冷却，N 越大越省加载也越积热；任务间冷却=帧间冷却。</div>
+    <div class="row">• <b>范围夹取：</b>所有帧号/块端点自动夹进当前任务的 [起始帧, 结束帧]，N 允许 ≥ 总帧数一次渲完。</div>
   </div>
 </div>
 </body>

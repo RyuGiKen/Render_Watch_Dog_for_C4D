@@ -60,29 +60,13 @@ namespace RenderServerGui.UI
             this.lblFrExe = new System.Windows.Forms.Label();
             this.txtFrExe = new System.Windows.Forms.TextBox();
             this.btnFrExe = new System.Windows.Forms.Button();
-            this.lblFrScene = new System.Windows.Forms.Label();
-            this.txtFrScene = new System.Windows.Forms.TextBox();
-            this.btnFrScene = new System.Windows.Forms.Button();
-            this.btnFrPreview = new System.Windows.Forms.Button();
-            this.lblMaxChunk = new System.Windows.Forms.Label();
-            this.numMaxChunk = new System.Windows.Forms.NumericUpDown();
             this.lblFrProc = new System.Windows.Forms.Label();
             this.txtFrProc = new System.Windows.Forms.TextBox();
             this.lblFrReport = new System.Windows.Forms.Label();
             this.txtFrReport = new System.Windows.Forms.TextBox();
             this.btnFrReport = new System.Windows.Forms.Button();
-            this.lblFrOutput = new System.Windows.Forms.Label();
-            this.txtFrOutput = new System.Windows.Forms.TextBox();
-            this.btnFrOutput = new System.Windows.Forms.Button();
-            this.lblFrStart = new System.Windows.Forms.Label();
-            this.numFrStart = new System.Windows.Forms.NumericUpDown();
-            this.lblFrEnd = new System.Windows.Forms.Label();
-            this.numFrEnd = new System.Windows.Forms.NumericUpDown();
-            this.lblRangeCount = new System.Windows.Forms.Label();
             this.lblFrCooldown = new System.Windows.Forms.Label();
             this.numFrCooldown = new System.Windows.Forms.NumericUpDown();
-            this.lblFrTimeout = new System.Windows.Forms.Label();
-            this.numFrTimeout = new System.Windows.Forms.NumericUpDown();
             this.lblFrInterval = new System.Windows.Forms.Label();
             this.numFrInterval = new System.Windows.Forms.NumericUpDown();
             this.lblFrRetry = new System.Windows.Forms.Label();
@@ -91,6 +75,29 @@ namespace RenderServerGui.UI
             this.numFrFail = new System.Windows.Forms.NumericUpDown();
             this.lblFrOnFail = new System.Windows.Forms.Label();
             this.cmbFrOnFail = new System.Windows.Forms.ComboBox();
+            this.lblTaskList = new System.Windows.Forms.Label();
+            this.lstTasks = new System.Windows.Forms.ListBox();
+            this.btnTaskAdd = new System.Windows.Forms.Button();
+            this.btnTaskRemove = new System.Windows.Forms.Button();
+            this.btnTaskUp = new System.Windows.Forms.Button();
+            this.btnTaskDown = new System.Windows.Forms.Button();
+            this.lblTaskDetail = new System.Windows.Forms.Label();
+            this.lblFrScene = new System.Windows.Forms.Label();
+            this.txtFrScene = new System.Windows.Forms.TextBox();
+            this.btnFrScene = new System.Windows.Forms.Button();
+            this.lblFrOutput = new System.Windows.Forms.Label();
+            this.txtFrOutput = new System.Windows.Forms.TextBox();
+            this.btnFrOutput = new System.Windows.Forms.Button();
+            this.lblFrStart = new System.Windows.Forms.Label();
+            this.numFrStart = new System.Windows.Forms.NumericUpDown();
+            this.lblFrEnd = new System.Windows.Forms.Label();
+            this.numFrEnd = new System.Windows.Forms.NumericUpDown();
+            this.lblRangeCount = new System.Windows.Forms.Label();
+            this.lblMaxChunk = new System.Windows.Forms.Label();
+            this.numMaxChunk = new System.Windows.Forms.NumericUpDown();
+            this.lblFrTimeout = new System.Windows.Forms.Label();
+            this.numFrTimeout = new System.Windows.Forms.NumericUpDown();
+            this.btnFrPreview = new System.Windows.Forms.Button();
 
             this.panelLog = new System.Windows.Forms.Panel();
             this.lblLogTitle = new System.Windows.Forms.Label();
@@ -200,12 +207,11 @@ namespace RenderServerGui.UI
             this.cmbLang.Size = new System.Drawing.Size(130, 25);
 
             // panelParams
-            this.panelParams.AutoScroll = true;
             this.panelParams.Controls.Add(this.grpTeamRender);
             this.panelParams.Controls.Add(this.grpFrame);
             this.panelParams.Location = new System.Drawing.Point(0, 56);
             this.panelParams.Name = "panelParams";
-            this.panelParams.Size = new System.Drawing.Size(574, 486);
+            this.panelParams.Size = new System.Drawing.Size(574, 606);
 
             // grpTeamRender
             this.grpTeamRender.Controls.Add(this.lblTrExe);
@@ -273,29 +279,13 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.lblFrExe);
             this.grpFrame.Controls.Add(this.txtFrExe);
             this.grpFrame.Controls.Add(this.btnFrExe);
-            this.grpFrame.Controls.Add(this.lblFrScene);
-            this.grpFrame.Controls.Add(this.txtFrScene);
-            this.grpFrame.Controls.Add(this.btnFrScene);
-            this.grpFrame.Controls.Add(this.lblMaxChunk);
-            this.grpFrame.Controls.Add(this.numMaxChunk);
-            this.grpFrame.Controls.Add(this.btnFrPreview);
             this.grpFrame.Controls.Add(this.lblFrProc);
             this.grpFrame.Controls.Add(this.txtFrProc);
             this.grpFrame.Controls.Add(this.lblFrReport);
             this.grpFrame.Controls.Add(this.txtFrReport);
             this.grpFrame.Controls.Add(this.btnFrReport);
-            this.grpFrame.Controls.Add(this.lblFrOutput);
-            this.grpFrame.Controls.Add(this.txtFrOutput);
-            this.grpFrame.Controls.Add(this.btnFrOutput);
-            this.grpFrame.Controls.Add(this.lblFrStart);
-            this.grpFrame.Controls.Add(this.numFrStart);
-            this.grpFrame.Controls.Add(this.lblFrEnd);
-            this.grpFrame.Controls.Add(this.numFrEnd);
-            this.grpFrame.Controls.Add(this.lblRangeCount);
             this.grpFrame.Controls.Add(this.lblFrCooldown);
             this.grpFrame.Controls.Add(this.numFrCooldown);
-            this.grpFrame.Controls.Add(this.lblFrTimeout);
-            this.grpFrame.Controls.Add(this.numFrTimeout);
             this.grpFrame.Controls.Add(this.lblFrInterval);
             this.grpFrame.Controls.Add(this.numFrInterval);
             this.grpFrame.Controls.Add(this.lblFrRetry);
@@ -304,13 +294,36 @@ namespace RenderServerGui.UI
             this.grpFrame.Controls.Add(this.numFrFail);
             this.grpFrame.Controls.Add(this.lblFrOnFail);
             this.grpFrame.Controls.Add(this.cmbFrOnFail);
+            this.grpFrame.Controls.Add(this.lblTaskList);
+            this.grpFrame.Controls.Add(this.lstTasks);
+            this.grpFrame.Controls.Add(this.btnTaskAdd);
+            this.grpFrame.Controls.Add(this.btnTaskRemove);
+            this.grpFrame.Controls.Add(this.btnTaskUp);
+            this.grpFrame.Controls.Add(this.btnTaskDown);
+            this.grpFrame.Controls.Add(this.lblTaskDetail);
+            this.grpFrame.Controls.Add(this.lblFrScene);
+            this.grpFrame.Controls.Add(this.txtFrScene);
+            this.grpFrame.Controls.Add(this.btnFrScene);
+            this.grpFrame.Controls.Add(this.lblFrOutput);
+            this.grpFrame.Controls.Add(this.txtFrOutput);
+            this.grpFrame.Controls.Add(this.btnFrOutput);
+            this.grpFrame.Controls.Add(this.lblFrStart);
+            this.grpFrame.Controls.Add(this.numFrStart);
+            this.grpFrame.Controls.Add(this.lblFrEnd);
+            this.grpFrame.Controls.Add(this.numFrEnd);
+            this.grpFrame.Controls.Add(this.lblRangeCount);
+            this.grpFrame.Controls.Add(this.lblMaxChunk);
+            this.grpFrame.Controls.Add(this.numMaxChunk);
+            this.grpFrame.Controls.Add(this.lblFrTimeout);
+            this.grpFrame.Controls.Add(this.numFrTimeout);
+            this.grpFrame.Controls.Add(this.btnFrPreview);
             this.grpFrame.Location = new System.Drawing.Point(8, 6);
             this.grpFrame.Name = "grpFrame";
-            this.grpFrame.Size = new System.Drawing.Size(560, 478);
+            this.grpFrame.Size = new System.Drawing.Size(560, 585);
             this.grpFrame.Text = "单帧调度参数";
             this.grpFrame.Visible = false;
 
-            // Frame rows
+            // ── 全局参数区 ──
             this.lblFrExe.AutoSize = true; this.lblFrExe.Location = new System.Drawing.Point(14, 32); this.lblFrExe.Name = "lblFrExe"; this.lblFrExe.Text = "主程序路径";
             this.txtFrExe.Location = new System.Drawing.Point(210, 28); this.txtFrExe.Name = "txtFrExe"; this.txtFrExe.Size = new System.Drawing.Size(300, 23);
             this.btnFrExe.Location = new System.Drawing.Point(514, 27); this.btnFrExe.Name = "btnFrExe"; this.btnFrExe.Size = new System.Drawing.Size(30, 25); this.btnFrExe.Text = "…"; this.btnFrExe.UseVisualStyleBackColor = true;
@@ -322,45 +335,56 @@ namespace RenderServerGui.UI
             this.txtFrReport.Location = new System.Drawing.Point(210, 92); this.txtFrReport.Name = "txtFrReport"; this.txtFrReport.Size = new System.Drawing.Size(300, 23);
             this.btnFrReport.Location = new System.Drawing.Point(514, 91); this.btnFrReport.Name = "btnFrReport"; this.btnFrReport.Size = new System.Drawing.Size(30, 25); this.btnFrReport.Text = "…"; this.btnFrReport.UseVisualStyleBackColor = true;
 
-            this.lblFrScene.AutoSize = true; this.lblFrScene.Location = new System.Drawing.Point(14, 128); this.lblFrScene.Name = "lblFrScene"; this.lblFrScene.Text = "工程文件";
-            this.txtFrScene.Location = new System.Drawing.Point(210, 124); this.txtFrScene.Name = "txtFrScene"; this.txtFrScene.Size = new System.Drawing.Size(300, 23);
-            this.btnFrScene.Location = new System.Drawing.Point(514, 123); this.btnFrScene.Name = "btnFrScene"; this.btnFrScene.Size = new System.Drawing.Size(30, 25); this.btnFrScene.Text = "…"; this.btnFrScene.UseVisualStyleBackColor = true;
+            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 128); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
+            this.numFrCooldown.Location = new System.Drawing.Point(150, 124); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(70, 23);
+            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(250, 128); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
+            this.numFrInterval.Location = new System.Drawing.Point(370, 124); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(70, 23);
 
-            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 160); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
-            this.txtFrOutput.Location = new System.Drawing.Point(210, 156); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(300, 23);
-            this.btnFrOutput.Location = new System.Drawing.Point(514, 155); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
+            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 160); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大异常次数";
+            this.numFrRetry.Location = new System.Drawing.Point(150, 156); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(70, 23);
+            this.lblFrFail.AutoSize = true; this.lblFrFail.Location = new System.Drawing.Point(250, 160); this.lblFrFail.Name = "lblFrFail"; this.lblFrFail.Text = "帧最大失败";
+            this.numFrFail.Location = new System.Drawing.Point(370, 156); this.numFrFail.Name = "numFrFail"; this.numFrFail.Size = new System.Drawing.Size(70, 23);
 
-            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 192); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起~止)";
-            this.numFrStart.Location = new System.Drawing.Point(210, 188); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
-            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(294, 192); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~";
-            this.numFrEnd.Location = new System.Drawing.Point(312, 188); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
-            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = System.Drawing.Color.Gray; this.lblRangeCount.Location = new System.Drawing.Point(406, 192); this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧";
-
-            this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 224); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
-            this.numMaxChunk.Location = new System.Drawing.Point(210, 220); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(110, 23);
-
-            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 256); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
-            this.numFrCooldown.Location = new System.Drawing.Point(210, 252); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(110, 23);
-
-            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 288); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "无进展超时(秒)";
-            this.numFrTimeout.Location = new System.Drawing.Point(210, 284); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(110, 23);
-
-            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(14, 320); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
-            this.numFrInterval.Location = new System.Drawing.Point(210, 316); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(110, 23);
-
-            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 352); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大异常次数";
-            this.numFrRetry.Location = new System.Drawing.Point(210, 348); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(110, 23);
-
-            this.lblFrFail.AutoSize = true; this.lblFrFail.Location = new System.Drawing.Point(14, 384); this.lblFrFail.Name = "lblFrFail"; this.lblFrFail.Text = "帧最大失败次数";
-            this.numFrFail.Location = new System.Drawing.Point(210, 380); this.numFrFail.Name = "numFrFail"; this.numFrFail.Size = new System.Drawing.Size(110, 23);
-
-            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 416); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
+            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 192); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
             this.cmbFrOnFail.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbFrOnFail.FormattingEnabled = true;
             this.cmbFrOnFail.Items.AddRange(new object[] { "停止并告警", "跳过继续" });
-            this.cmbFrOnFail.Location = new System.Drawing.Point(210, 412); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(200, 25);
+            this.cmbFrOnFail.Location = new System.Drawing.Point(150, 188); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(160, 25);
 
-            this.btnFrPreview.Location = new System.Drawing.Point(210, 444); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(290, 26);
+            // ── 任务队列区 ──
+            this.lblTaskList.AutoSize = true; this.lblTaskList.Location = new System.Drawing.Point(14, 224); this.lblTaskList.Name = "lblTaskList"; this.lblTaskList.Text = "任务队列"; this.lblTaskList.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lstTasks.Location = new System.Drawing.Point(14, 246); this.lstTasks.Name = "lstTasks"; this.lstTasks.Size = new System.Drawing.Size(430, 100);
+            this.lstTasks.IntegralHeight = false;
+            this.lstTasks.SelectionMode = System.Windows.Forms.SelectionMode.One;
+            this.btnTaskAdd.Location = new System.Drawing.Point(454, 246); this.btnTaskAdd.Name = "btnTaskAdd"; this.btnTaskAdd.Size = new System.Drawing.Size(90, 26); this.btnTaskAdd.Text = "添加"; this.btnTaskAdd.UseVisualStyleBackColor = true;
+            this.btnTaskRemove.Location = new System.Drawing.Point(454, 278); this.btnTaskRemove.Name = "btnTaskRemove"; this.btnTaskRemove.Size = new System.Drawing.Size(90, 26); this.btnTaskRemove.Text = "删除"; this.btnTaskRemove.UseVisualStyleBackColor = true;
+            this.btnTaskUp.Location = new System.Drawing.Point(454, 310); this.btnTaskUp.Name = "btnTaskUp"; this.btnTaskUp.Size = new System.Drawing.Size(42, 26); this.btnTaskUp.Text = "↑"; this.btnTaskUp.UseVisualStyleBackColor = true;
+            this.btnTaskDown.Location = new System.Drawing.Point(502, 310); this.btnTaskDown.Name = "btnTaskDown"; this.btnTaskDown.Size = new System.Drawing.Size(42, 26); this.btnTaskDown.Text = "↓"; this.btnTaskDown.UseVisualStyleBackColor = true;
+
+            // ── 选中任务参数区 ──
+            this.lblTaskDetail.AutoSize = true; this.lblTaskDetail.Location = new System.Drawing.Point(14, 354); this.lblTaskDetail.Name = "lblTaskDetail"; this.lblTaskDetail.Text = "选中任务参数"; this.lblTaskDetail.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
+
+            this.lblFrScene.AutoSize = true; this.lblFrScene.Location = new System.Drawing.Point(14, 382); this.lblFrScene.Name = "lblFrScene"; this.lblFrScene.Text = "工程文件";
+            this.txtFrScene.Location = new System.Drawing.Point(210, 378); this.txtFrScene.Name = "txtFrScene"; this.txtFrScene.Size = new System.Drawing.Size(300, 23);
+            this.btnFrScene.Location = new System.Drawing.Point(514, 377); this.btnFrScene.Name = "btnFrScene"; this.btnFrScene.Size = new System.Drawing.Size(30, 25); this.btnFrScene.Text = "…"; this.btnFrScene.UseVisualStyleBackColor = true;
+
+            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 414); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
+            this.txtFrOutput.Location = new System.Drawing.Point(210, 410); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(300, 23);
+            this.btnFrOutput.Location = new System.Drawing.Point(514, 409); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
+
+            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 446); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起~止)";
+            this.numFrStart.Location = new System.Drawing.Point(210, 442); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
+            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(294, 446); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~";
+            this.numFrEnd.Location = new System.Drawing.Point(312, 442); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
+            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = System.Drawing.Color.Gray; this.lblRangeCount.Location = new System.Drawing.Point(406, 446); this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧";
+
+            this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 478); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
+            this.numMaxChunk.Location = new System.Drawing.Point(210, 474); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(110, 23);
+
+            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 510); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "无进展超时(秒)";
+            this.numFrTimeout.Location = new System.Drawing.Point(210, 506); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(110, 23);
+
+            this.btnFrPreview.Location = new System.Drawing.Point(210, 540); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(290, 26);
             this.btnFrPreview.Text = "预览输出文件名并校验目录"; this.btnFrPreview.UseVisualStyleBackColor = true;
 
             // panelLog
@@ -369,7 +393,7 @@ namespace RenderServerGui.UI
             this.panelLog.Controls.Add(this.rtbLog);
             this.panelLog.Location = new System.Drawing.Point(582, 56);
             this.panelLog.Name = "panelLog";
-            this.panelLog.Size = new System.Drawing.Size(452, 486);
+            this.panelLog.Size = new System.Drawing.Size(452, 606);
 
             this.lblLogTitle.AutoSize = true;
             this.lblLogTitle.Location = new System.Drawing.Point(12, 8);
@@ -388,13 +412,13 @@ namespace RenderServerGui.UI
             this.rtbLog.Name = "rtbLog";
             this.rtbLog.ReadOnly = true;
             this.rtbLog.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.rtbLog.Size = new System.Drawing.Size(432, 448);
+            this.rtbLog.Size = new System.Drawing.Size(432, 564);
             this.rtbLog.WordWrap = true;
 
             // MainForm
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1040, 548);
+            this.ClientSize = new System.Drawing.Size(1040, 670);
             this.Controls.Add(this.panelTop);
             this.Controls.Add(this.panelParams);
             this.Controls.Add(this.panelLog);
@@ -472,37 +496,44 @@ namespace RenderServerGui.UI
         private System.Windows.Forms.Label lblFrExe;
         private System.Windows.Forms.TextBox txtFrExe;
         private System.Windows.Forms.Button btnFrExe;
-        private System.Windows.Forms.Label lblFrScene;
-        private System.Windows.Forms.TextBox txtFrScene;
-        private System.Windows.Forms.Button btnFrScene;
-        private System.Windows.Forms.Button btnFrPreview;
         private System.Windows.Forms.Label lblFrProc;
         private System.Windows.Forms.TextBox txtFrProc;
         private System.Windows.Forms.Label lblFrReport;
         private System.Windows.Forms.TextBox txtFrReport;
         private System.Windows.Forms.Button btnFrReport;
-        private System.Windows.Forms.Label lblFrOutput;
-        private System.Windows.Forms.TextBox txtFrOutput;
-        private System.Windows.Forms.Button btnFrOutput;
-        private System.Windows.Forms.Label lblFrStart;
-        private System.Windows.Forms.NumericUpDown numFrStart;
-        private System.Windows.Forms.Label lblFrEnd;
-        private System.Windows.Forms.Label lblRangeCount;
-        private System.Windows.Forms.NumericUpDown numFrEnd;
         private System.Windows.Forms.Label lblFrCooldown;
         private System.Windows.Forms.NumericUpDown numFrCooldown;
-        private System.Windows.Forms.Label lblFrTimeout;
-        private System.Windows.Forms.NumericUpDown numFrTimeout;
         private System.Windows.Forms.Label lblFrInterval;
         private System.Windows.Forms.NumericUpDown numFrInterval;
         private System.Windows.Forms.Label lblFrRetry;
         private System.Windows.Forms.NumericUpDown numFrRetry;
         private System.Windows.Forms.Label lblFrFail;
         private System.Windows.Forms.NumericUpDown numFrFail;
-        private System.Windows.Forms.Label lblMaxChunk;
-        private System.Windows.Forms.NumericUpDown numMaxChunk;
         private System.Windows.Forms.Label lblFrOnFail;
         private System.Windows.Forms.ComboBox cmbFrOnFail;
+        private System.Windows.Forms.Label lblTaskList;
+        private System.Windows.Forms.ListBox lstTasks;
+        private System.Windows.Forms.Button btnTaskAdd;
+        private System.Windows.Forms.Button btnTaskRemove;
+        private System.Windows.Forms.Button btnTaskUp;
+        private System.Windows.Forms.Button btnTaskDown;
+        private System.Windows.Forms.Label lblTaskDetail;
+        private System.Windows.Forms.Label lblFrScene;
+        private System.Windows.Forms.TextBox txtFrScene;
+        private System.Windows.Forms.Button btnFrScene;
+        private System.Windows.Forms.Label lblFrOutput;
+        private System.Windows.Forms.TextBox txtFrOutput;
+        private System.Windows.Forms.Button btnFrOutput;
+        private System.Windows.Forms.Label lblFrStart;
+        private System.Windows.Forms.NumericUpDown numFrStart;
+        private System.Windows.Forms.Label lblFrEnd;
+        private System.Windows.Forms.NumericUpDown numFrEnd;
+        private System.Windows.Forms.Label lblRangeCount;
+        private System.Windows.Forms.Label lblMaxChunk;
+        private System.Windows.Forms.NumericUpDown numMaxChunk;
+        private System.Windows.Forms.Label lblFrTimeout;
+        private System.Windows.Forms.NumericUpDown numFrTimeout;
+        private System.Windows.Forms.Button btnFrPreview;
 
         private System.Windows.Forms.Panel panelLog;
         private System.Windows.Forms.Label lblLogTitle;

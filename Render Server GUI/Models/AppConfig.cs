@@ -91,6 +91,9 @@ namespace RenderServerGui.Models
                     cfg.Cinema4D = cfg.Cinema4D ?? ModeProfile.ForPreset(RenderMode.Cinema4D);
                     cfg.Commandline = cfg.Commandline ?? ModeProfile.ForPreset(RenderMode.Commandline);
                     if (string.IsNullOrWhiteSpace(cfg.Language)) cfg.Language = "zh-CN";
+                    // 逐帧模式：旧配置无 Tasks 节点时从旧字段迁移
+                    cfg.Cinema4D.MigrateToTasks();
+                    cfg.Commandline.MigrateToTasks();
                     return cfg;
                 }
             }

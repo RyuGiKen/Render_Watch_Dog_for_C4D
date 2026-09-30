@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Models\RenderMode.cs" />
+    <Compile Include="Models\RenderTask.cs" />
     <Compile Include="Models\ModeProfile.cs" />
     <Compile Include="Models\AppConfig.cs" />
     <Compile Include="Services\IRenderController.cs" />
