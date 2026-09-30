@@ -45,6 +45,9 @@ A Cinema 4D watchdog + multi-task per-frame/chunk render scheduler (Windows desk
 - **配置持久化** / Persistent settings  
   所有参数存 `settings.xml`，重启恢复。  
   All parameters are saved to `settings.xml` and restored on restart.
+- **单实例** / Single instance  
+  同一 exe 只允许运行一份，重复启动会静默退出。  
+  Only one instance of the exe may run; duplicate launches exit silently.
 
 ## 多语言 / Localization
 
