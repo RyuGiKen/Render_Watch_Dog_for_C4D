@@ -37,6 +37,7 @@ ui.taskDetail=選中任務參數
 ui.taskWord=任務
 ui.taskNoScene=（未設置工程）
 ui.preview=預覽輸出檔名並檢查目錄
+ui.keepAwake=阻止睡眠
 ui.logTitle=執行日誌
 ui.clearLog=清除日誌
 ui.count=共 {0} 影格

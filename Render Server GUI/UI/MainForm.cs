@@ -101,6 +101,7 @@ namespace RenderServerGui.UI
             numFrStart.ValueChanged += (s, e) => UpdateRangeCount();
             numFrEnd.ValueChanged += (s, e) => UpdateRangeCount();
             cmbLang.SelectedIndexChanged += (s, e) => OnLanguageChanged();
+            chkKeepAwake.CheckedChanged += (s, e) => OnKeepAwakeChanged();
 
             // 编辑区任一参数变化：写回配置并即时刷新列表项显示
             txtFrScene.TextChanged += (s, e) => OnTaskEditChanged();
@@ -162,6 +163,23 @@ namespace RenderServerGui.UI
             ApplyLanguage();
         }
 
+        /// <summary>阻止睡眠开关切换：持久化配置；渲染运行中立即生效/解除。</summary>
+        private void OnKeepAwakeChanged()
+        {
+            if (!_uiReady) return;
+            _cfg.DisableKeepAwake = !chkKeepAwake.Checked;
+            _cfg.Save(out _);
+            if (_controller != null && _controller.IsRunning)
+            {
+                if (chkKeepAwake.Checked) KeepAwake.Enable();
+                else KeepAwake.Disable();
+            }
+            else if (!chkKeepAwake.Checked)
+            {
+                KeepAwake.Disable(); // 未运行时关开关，确保无残留置位
+            }
+        }
+
         /// <summary>把界面所有可见文字按当前语言重设。</summary>
         private void ApplyLanguage()
         {
@@ -175,6 +193,7 @@ namespace RenderServerGui.UI
             });
             btnStart.Text = Localizer.T("ui.start", "启动");
             btnStop.Text = Localizer.T("ui.stop", "停止");
+            chkKeepAwake.Text = Localizer.T("ui.keepAwake", "阻止睡眠");
             lblLang.Text = Localizer.T("ui.lang", "语言");
 
             // Team Render 分组
@@ -279,6 +298,7 @@ namespace RenderServerGui.UI
         private void LoadConfigIntoUi()
         {
             _cfg = AppConfig.Load();
+            chkKeepAwake.Checked = !_cfg.DisableKeepAwake;
             cmbMode.SelectedIndex = ModeToIndex(_cfg.Mode);
             ApplyModeToUi(_cfg.Mode);
         }
@@ -736,16 +756,19 @@ namespace RenderServerGui.UI
             {
                 case RunnerStatus.Running:
                     lblStatusDot.BackColor = Color.ForestGreen;
+                    if (chkKeepAwake.Checked) KeepAwake.Enable();
                     break;
                 case RunnerStatus.Stopping:
                     lblStatusDot.BackColor = Color.DarkOrange;
                     break;
                 case RunnerStatus.Error:
                     lblStatusDot.BackColor = Color.Firebrick;
+                    KeepAwake.Disable();
                     SetRunningUi(false);
                     break;
                 default:
                     lblStatusDot.BackColor = Color.Gray;
+                    KeepAwake.Disable();
                     SetRunningUi(false);
                     break;
             }
@@ -931,6 +954,7 @@ namespace RenderServerGui.UI
                 _controller.Stop();
                 System.Threading.Thread.Sleep(200);
             }
+            KeepAwake.Disable(); // 关窗即解除防睡眠置位（进程退出系统也会自动回收）
             CommitAll();
             _cfg.Save(out _);
         }

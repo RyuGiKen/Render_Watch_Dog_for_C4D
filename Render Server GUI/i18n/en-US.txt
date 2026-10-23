@@ -37,6 +37,7 @@ ui.taskDetail=Selected task
 ui.taskWord=Task
 ui.taskNoScene=(no project)
 ui.preview=Preview names & check folder
+ui.keepAwake=Prevent sleep
 ui.logTitle=Log
 ui.clearLog=Clear log
 ui.count=Total {0} frame(s)

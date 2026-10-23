@@ -17,6 +17,12 @@ namespace RenderServerGui.Models
         /// <summary>界面语言码（如 zh-CN / zh-HK / en-US），默认简体中文。</summary>
         public string Language { get; set; } = "zh-CN";
 
+        /// <summary>
+        /// 是否"禁用渲染时阻止系统睡眠"。反向存储：旧版 settings.xml 无此节点时反序列化为 false，
+        /// 即默认启用防睡眠（复选框默认勾选）。
+        /// </summary>
+        public bool DisableKeepAwake { get; set; }
+
         /// <summary>Team Render 模式参数。</summary>
         public ModeProfile TeamRender { get; set; }
 

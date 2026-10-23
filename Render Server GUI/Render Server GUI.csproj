@@ -55,6 +55,7 @@
     <Compile Include="Services\ProcessHealth.cs" />
     <Compile Include="Services\FrameScanner.cs" />
     <Compile Include="Services\Localizer.cs" />
+    <Compile Include="Services\KeepAwake.cs" />
     <Compile Include="Services\TeamRenderController.cs" />
     <Compile Include="Services\FrameRenderController.cs" />
     <Compile Include="UI\MainForm.cs">

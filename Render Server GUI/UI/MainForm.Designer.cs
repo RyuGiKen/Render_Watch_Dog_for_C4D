@@ -28,6 +28,7 @@ namespace RenderServerGui.UI
             this.lblStatusDot = new System.Windows.Forms.Panel();
             this.lblStatusText = new System.Windows.Forms.Label();
             this.progressBar = new System.Windows.Forms.ProgressBar();
+            this.chkKeepAwake = new System.Windows.Forms.CheckBox();
             this.lblLang = new System.Windows.Forms.Label();
             this.cmbLang = new System.Windows.Forms.ComboBox();
 
@@ -132,11 +133,12 @@ namespace RenderServerGui.UI
             this.panelTop.Controls.Add(this.lblStatusDot);
             this.panelTop.Controls.Add(this.lblStatusText);
             this.panelTop.Controls.Add(this.progressBar);
+            this.panelTop.Controls.Add(this.chkKeepAwake);
             this.panelTop.Controls.Add(this.lblLang);
             this.panelTop.Controls.Add(this.cmbLang);
             this.panelTop.Location = new System.Drawing.Point(0, 0);
             this.panelTop.Name = "panelTop";
-            this.panelTop.Size = new System.Drawing.Size(1040, 56);
+            this.panelTop.Size = new System.Drawing.Size(1130, 56);
 
             // lblMode
             this.lblMode.AutoSize = false;
@@ -186,15 +188,24 @@ namespace RenderServerGui.UI
             this.lblStatusText.Text = "已停止";
 
             // progressBar
-            this.progressBar.Location = new System.Drawing.Point(620, 18);
+            this.progressBar.Location = new System.Drawing.Point(600, 18);
             this.progressBar.Name = "progressBar";
-            this.progressBar.Size = new System.Drawing.Size(170, 20);
+            this.progressBar.Size = new System.Drawing.Size(160, 20);
             this.progressBar.Visible = false;
+
+            // chkKeepAwake
+            this.chkKeepAwake.AutoSize = true;
+            this.chkKeepAwake.Checked = true;
+            this.chkKeepAwake.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkKeepAwake.Location = new System.Drawing.Point(772, 20);
+            this.chkKeepAwake.Name = "chkKeepAwake";
+            this.chkKeepAwake.Text = "阻止睡眠";
+            this.chkKeepAwake.UseVisualStyleBackColor = true;
 
             // lblLang
             this.lblLang.AutoSize = false;
             this.lblLang.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.lblLang.Location = new System.Drawing.Point(800, 20);
+            this.lblLang.Location = new System.Drawing.Point(884, 20);
             this.lblLang.Name = "lblLang";
             this.lblLang.Size = new System.Drawing.Size(90, 17);
             this.lblLang.Text = "语言";
@@ -202,7 +213,7 @@ namespace RenderServerGui.UI
             // cmbLang
             this.cmbLang.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbLang.FormattingEnabled = true;
-            this.cmbLang.Location = new System.Drawing.Point(890, 16);
+            this.cmbLang.Location = new System.Drawing.Point(974, 16);
             this.cmbLang.Name = "cmbLang";
             this.cmbLang.Size = new System.Drawing.Size(130, 25);
 
@@ -393,14 +404,14 @@ namespace RenderServerGui.UI
             this.panelLog.Controls.Add(this.rtbLog);
             this.panelLog.Location = new System.Drawing.Point(582, 56);
             this.panelLog.Name = "panelLog";
-            this.panelLog.Size = new System.Drawing.Size(452, 606);
+            this.panelLog.Size = new System.Drawing.Size(540, 606);
 
             this.lblLogTitle.AutoSize = true;
             this.lblLogTitle.Location = new System.Drawing.Point(12, 8);
             this.lblLogTitle.Name = "lblLogTitle";
             this.lblLogTitle.Text = "运行日志";
 
-            this.btnClearLog.Location = new System.Drawing.Point(348, 6);
+            this.btnClearLog.Location = new System.Drawing.Point(436, 6);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(96, 24);
             this.btnClearLog.Text = "清空日志";
@@ -412,13 +423,13 @@ namespace RenderServerGui.UI
             this.rtbLog.Name = "rtbLog";
             this.rtbLog.ReadOnly = true;
             this.rtbLog.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.rtbLog.Size = new System.Drawing.Size(432, 564);
+            this.rtbLog.Size = new System.Drawing.Size(516, 564);
             this.rtbLog.WordWrap = true;
 
             // MainForm
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1040, 670);
+            this.ClientSize = new System.Drawing.Size(1130, 670);
             this.Controls.Add(this.panelTop);
             this.Controls.Add(this.panelParams);
             this.Controls.Add(this.panelLog);
@@ -464,6 +475,7 @@ namespace RenderServerGui.UI
         private System.Windows.Forms.Panel lblStatusDot;
         private System.Windows.Forms.Label lblStatusText;
         private System.Windows.Forms.ProgressBar progressBar;
+        private System.Windows.Forms.CheckBox chkKeepAwake;
         private System.Windows.Forms.Label lblLang;
         private System.Windows.Forms.ComboBox cmbLang;
 

@@ -45,6 +45,9 @@ A Cinema 4D watchdog + multi-task per-frame/chunk render scheduler (Windows desk
 - **配置持久化** / Persistent settings  
   所有参数存 `settings.xml`，重启恢复。  
   All parameters are saved to `settings.xml` and restored on restart.
+- **渲染时防睡眠** / Prevent sleep during render  
+  运行期间置系统执行状态阻止睡眠（不影响关屏），顶部“阻止睡眠”复选框可随时开关，停止/异常/关窗即恢复。  
+  While running, the app asserts the system execution state to block sleep (screen blanking unaffected); a top "Prevent sleep" checkbox toggles it live, and stopping / error / closing releases it.
 - **单实例** / Single instance  
   同一 exe 只允许运行一份，重复启动会静默退出。  
   Only one instance of the exe may run; duplicate launches exit silently.
