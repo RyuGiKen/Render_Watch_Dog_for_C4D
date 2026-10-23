@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows.Forms;
 
 namespace RenderServerGui.UI
@@ -18,114 +18,164 @@ namespace RenderServerGui.UI
 
         #region Windows 窗体设计器生成的代码
 
+        // ── 布局工厂辅助（减少重复，保证一致的锚定/边距）──
+        private static Label MakeLabel(string name, string text)
+        {
+            var l = new Label();
+            l.AutoSize = true; l.Name = name; l.Text = text;
+            l.Anchor = AnchorStyles.Top | AnchorStyles.Left; l.Margin = new Padding(3, 7, 6, 3); return l;
+        }
+        private static Label MakeHeader(string name, string text)
+        {
+            var l = new Label();
+            l.AutoSize = true; l.Name = name; l.Text = text;
+            l.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            l.Anchor = AnchorStyles.Top | AnchorStyles.Left; l.Margin = new Padding(3, 8, 3, 3); return l;
+        }
+        private static TextBox MakeText()
+        {
+            var t = new TextBox();
+            t.Dock = DockStyle.Fill; t.Margin = new Padding(3, 6, 3, 3); return t;
+        }
+        private static Button MakeBrowse()
+        {
+            var b = new Button();
+            b.Text = "…"; b.Size = new Size(30, 25); b.Dock = DockStyle.Fill; b.Margin = new Padding(3, 5, 0, 3); b.UseVisualStyleBackColor = true; return b;
+        }
+        private static NumericUpDown MakeNum(int w)
+        {
+            var n = new NumericUpDown();
+            n.Size = new Size(w, 23); n.Anchor = AnchorStyles.Top | AnchorStyles.Left; n.Margin = new Padding(3, 6, 3, 3); return n;
+        }
+        private static Button MakeToolBtn(string name, string text)
+        {
+            var b = new Button();
+            b.Name = name; b.Text = text; b.Size = new Size(30, 26); b.Margin = new Padding(2); b.UseVisualStyleBackColor = true; return b;
+        }
+
         private void InitializeComponent()
         {
-            this.panelTop = new System.Windows.Forms.Panel();
-            this.lblMode = new System.Windows.Forms.Label();
-            this.cmbMode = new System.Windows.Forms.ComboBox();
-            this.btnStart = new System.Windows.Forms.Button();
-            this.btnStop = new System.Windows.Forms.Button();
-            this.lblStatusDot = new System.Windows.Forms.Panel();
-            this.lblStatusText = new System.Windows.Forms.Label();
-            this.progressBar = new System.Windows.Forms.ProgressBar();
-            this.chkKeepAwake = new System.Windows.Forms.CheckBox();
-            this.lblLang = new System.Windows.Forms.Label();
-            this.cmbLang = new System.Windows.Forms.ComboBox();
+            this.panelTop = new FlowLayoutPanel();
+            this.lblMode = new Label();
+            this.cmbMode = new ComboBox();
+            this.btnStart = new Button();
+            this.btnStop = new Button();
+            this.lblStatusDot = new Panel();
+            this.lblStatusText = new Label();
+            this.progressBar = new ProgressBar();
+            this.chkKeepAwake = new CheckBox();
+            this.lblLang = new Label();
+            this.cmbLang = new ComboBox();
 
-            this.panelParams = new System.Windows.Forms.Panel();
-            this.grpTeamRender = new System.Windows.Forms.GroupBox();
-            this.lblTrExe = new System.Windows.Forms.Label();
-            this.txtTrExe = new System.Windows.Forms.TextBox();
-            this.btnTrExe = new System.Windows.Forms.Button();
-            this.lblTrProc = new System.Windows.Forms.Label();
-            this.txtTrProc = new System.Windows.Forms.TextBox();
-            this.lblTrPort = new System.Windows.Forms.Label();
-            this.numTrPort = new System.Windows.Forms.NumericUpDown();
-            this.lblTrInterval = new System.Windows.Forms.Label();
-            this.numTrInterval = new System.Windows.Forms.NumericUpDown();
-            this.lblTrHang = new System.Windows.Forms.Label();
-            this.numTrHang = new System.Windows.Forms.NumericUpDown();
-            this.lblTrWork = new System.Windows.Forms.Label();
-            this.numTrWork = new System.Windows.Forms.NumericUpDown();
-            this.lblTrRest = new System.Windows.Forms.Label();
-            this.numTrRest = new System.Windows.Forms.NumericUpDown();
-            this.lblTrReport = new System.Windows.Forms.Label();
-            this.txtTrReport = new System.Windows.Forms.TextBox();
-            this.btnTrReport = new System.Windows.Forms.Button();
-            this.lblTrCache = new System.Windows.Forms.Label();
-            this.txtTrCache = new System.Windows.Forms.TextBox();
-            this.btnTrCache = new System.Windows.Forms.Button();
-            this.chkTrClearCache = new System.Windows.Forms.CheckBox();
+            this.panelParams = new Panel();
+            this.grpTeamRender = new GroupBox();
+            this.pnlTrScroll = new Panel();
+            this.tflTr = new TableLayoutPanel();
+            this.lblTrExe = new Label();
+            this.txtTrExe = new TextBox();
+            this.btnTrExe = new Button();
+            this.lblTrProc = new Label();
+            this.txtTrProc = new TextBox();
+            this.lblTrReport = new Label();
+            this.txtTrReport = new TextBox();
+            this.btnTrReport = new Button();
+            this.lblTrCache = new Label();
+            this.txtTrCache = new TextBox();
+            this.btnTrCache = new Button();
+            this.lblTrPort = new Label();
+            this.numTrPort = new NumericUpDown();
+            this.lblTrInterval = new Label();
+            this.numTrInterval = new NumericUpDown();
+            this.lblTrHang = new Label();
+            this.numTrHang = new NumericUpDown();
+            this.lblTrWork = new Label();
+            this.numTrWork = new NumericUpDown();
+            this.lblTrRest = new Label();
+            this.numTrRest = new NumericUpDown();
+            this.chkTrClearCache = new CheckBox();
 
-            this.grpFrame = new System.Windows.Forms.GroupBox();
-            this.lblFrExe = new System.Windows.Forms.Label();
-            this.txtFrExe = new System.Windows.Forms.TextBox();
-            this.btnFrExe = new System.Windows.Forms.Button();
-            this.lblFrProc = new System.Windows.Forms.Label();
-            this.txtFrProc = new System.Windows.Forms.TextBox();
-            this.lblFrReport = new System.Windows.Forms.Label();
-            this.txtFrReport = new System.Windows.Forms.TextBox();
-            this.btnFrReport = new System.Windows.Forms.Button();
-            this.lblFrCooldown = new System.Windows.Forms.Label();
-            this.numFrCooldown = new System.Windows.Forms.NumericUpDown();
-            this.lblFrInterval = new System.Windows.Forms.Label();
-            this.numFrInterval = new System.Windows.Forms.NumericUpDown();
-            this.lblFrRetry = new System.Windows.Forms.Label();
-            this.numFrRetry = new System.Windows.Forms.NumericUpDown();
-            this.lblFrFail = new System.Windows.Forms.Label();
-            this.numFrFail = new System.Windows.Forms.NumericUpDown();
-            this.lblFrOnFail = new System.Windows.Forms.Label();
-            this.cmbFrOnFail = new System.Windows.Forms.ComboBox();
-            this.lblTaskList = new System.Windows.Forms.Label();
-            this.lstTasks = new System.Windows.Forms.ListBox();
-            this.btnTaskAdd = new System.Windows.Forms.Button();
-            this.btnTaskRemove = new System.Windows.Forms.Button();
-            this.btnTaskUp = new System.Windows.Forms.Button();
-            this.btnTaskDown = new System.Windows.Forms.Button();
-            this.lblTaskDetail = new System.Windows.Forms.Label();
-            this.lblFrScene = new System.Windows.Forms.Label();
-            this.txtFrScene = new System.Windows.Forms.TextBox();
-            this.btnFrScene = new System.Windows.Forms.Button();
-            this.lblFrOutput = new System.Windows.Forms.Label();
-            this.txtFrOutput = new System.Windows.Forms.TextBox();
-            this.btnFrOutput = new System.Windows.Forms.Button();
-            this.lblFrStart = new System.Windows.Forms.Label();
-            this.numFrStart = new System.Windows.Forms.NumericUpDown();
-            this.lblFrEnd = new System.Windows.Forms.Label();
-            this.numFrEnd = new System.Windows.Forms.NumericUpDown();
-            this.lblRangeCount = new System.Windows.Forms.Label();
-            this.lblMaxChunk = new System.Windows.Forms.Label();
-            this.numMaxChunk = new System.Windows.Forms.NumericUpDown();
-            this.lblFrTimeout = new System.Windows.Forms.Label();
-            this.numFrTimeout = new System.Windows.Forms.NumericUpDown();
-            this.btnFrPreview = new System.Windows.Forms.Button();
+            this.grpFrame = new GroupBox();
+            this.pnlFrameScroll = new Panel();
+            this.tflFrame = new TableLayoutPanel();
+            this.lblFrExe = new Label();
+            this.txtFrExe = new TextBox();
+            this.btnFrExe = new Button();
+            this.lblFrProc = new Label();
+            this.txtFrProc = new TextBox();
+            this.lblFrReport = new Label();
+            this.txtFrReport = new TextBox();
+            this.btnFrReport = new Button();
+            this.lblFrCooldown = new Label();
+            this.numFrCooldown = new NumericUpDown();
+            this.lblFrInterval = new Label();
+            this.numFrInterval = new NumericUpDown();
+            this.lblFrRetry = new Label();
+            this.numFrRetry = new NumericUpDown();
+            this.lblFrFail = new Label();
+            this.numFrFail = new NumericUpDown();
+            this.lblFrOnFail = new Label();
+            this.cmbFrOnFail = new ComboBox();
+            this.lblTaskList = new Label();
+            this.pnlTaskList = new Panel();
+            this.lstTasks = new ListBox();
+            this.tflTaskBtns = new TableLayoutPanel();
+            this.btnTaskAdd = new Button();
+            this.btnTaskRemove = new Button();
+            this.btnTaskUp = new Button();
+            this.btnTaskDown = new Button();
+            this.lblTaskDetail = new Label();
+            this.lblFrScene = new Label();
+            this.txtFrScene = new TextBox();
+            this.btnFrScene = new Button();
+            this.lblFrOutput = new Label();
+            this.txtFrOutput = new TextBox();
+            this.btnFrOutput = new Button();
+            this.lblFrStart = new Label();
+            this.pnlRange = new Panel();
+            this.numFrStart = new NumericUpDown();
+            this.lblFrEnd = new Label();
+            this.numFrEnd = new NumericUpDown();
+            this.lblRangeCount = new Label();
+            this.lblMaxChunk = new Label();
+            this.numMaxChunk = new NumericUpDown();
+            this.lblFrTimeout = new Label();
+            this.numFrTimeout = new NumericUpDown();
+            this.btnFrPreview = new Button();
 
-            this.panelLog = new System.Windows.Forms.Panel();
-            this.lblLogTitle = new System.Windows.Forms.Label();
-            this.btnClearLog = new System.Windows.Forms.Button();
-            this.rtbLog = new System.Windows.Forms.RichTextBox();
+            this.panelLog = new Panel();
+            this.rtbLog = new RichTextBox();
+            this.lblLogTitle = new Label();
+            this.btnClearLog = new Button();
 
-            this.panelTop.SuspendLayout();
-            this.panelParams.SuspendLayout();
-            this.grpTeamRender.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numTrPort)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrHang)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrWork)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrRest)).BeginInit();
-            this.grpFrame.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numFrStart)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numFrEnd)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrCooldown)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numFrTimeout)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrRetry)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrFail)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numFrStart)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numFrEnd)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxChunk)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numFrTimeout)).BeginInit();
+            this.panelTop.SuspendLayout();
+            this.panelParams.SuspendLayout();
+            this.grpTeamRender.SuspendLayout();
+            this.pnlTrScroll.SuspendLayout();
+            this.tflTr.SuspendLayout();
+            this.grpFrame.SuspendLayout();
+            this.pnlFrameScroll.SuspendLayout();
+            this.tflFrame.SuspendLayout();
+            this.pnlTaskList.SuspendLayout();
+            this.tflTaskBtns.SuspendLayout();
+            this.pnlRange.SuspendLayout();
             this.panelLog.SuspendLayout();
+            this.pnlRange.SuspendLayout();
             this.SuspendLayout();
 
-            // panelTop
+            // panelTop（顶部工具条：FlowLayoutPanel，宽度不足自动换到第二行）
             this.panelTop.Controls.Add(this.lblMode);
             this.panelTop.Controls.Add(this.cmbMode);
             this.panelTop.Controls.Add(this.btnStart);
@@ -136,420 +186,361 @@ namespace RenderServerGui.UI
             this.panelTop.Controls.Add(this.chkKeepAwake);
             this.panelTop.Controls.Add(this.lblLang);
             this.panelTop.Controls.Add(this.cmbLang);
-            this.panelTop.Location = new System.Drawing.Point(0, 0);
+            this.panelTop.Dock = DockStyle.Top;
             this.panelTop.Name = "panelTop";
-            this.panelTop.Size = new System.Drawing.Size(1130, 56);
+            this.panelTop.FlowDirection = FlowDirection.LeftToRight;
+            this.panelTop.WrapContents = true;
+            this.panelTop.AutoSize = true;
+            this.panelTop.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            this.panelTop.Padding = new Padding(8, 12, 8, 8);
+            this.panelTop.MinimumSize = new Size(0, 48);
+            this.panelTop.Size = new Size(1100, 48);
 
-            // lblMode
-            this.lblMode.AutoSize = false;
-            this.lblMode.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.lblMode.Location = new System.Drawing.Point(12, 20);
-            this.lblMode.Name = "lblMode";
-            this.lblMode.Size = new System.Drawing.Size(78, 17);
-            this.lblMode.Text = "模式";
+            this.lblMode.AutoSize = false; this.lblMode.TextAlign = ContentAlignment.MiddleCenter;
+            this.lblMode.Location = new Point(12, 20); this.lblMode.Name = "lblMode"; this.lblMode.Size = new Size(48, 17); this.lblMode.Text = "模式"; this.lblMode.Margin = new Padding(4, 12, 4, 3);
 
-            // cmbMode
-            this.cmbMode.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbMode.FormattingEnabled = true;
-            this.cmbMode.Items.AddRange(new object[] {
-                "Team Render（看门狗）",
-                "Cinema 4D（单帧）",
-                "Commandline（单帧）"});
-            this.cmbMode.Location = new System.Drawing.Point(90, 16);
-            this.cmbMode.Name = "cmbMode";
-            this.cmbMode.Size = new System.Drawing.Size(200, 25);
+            this.cmbMode.DropDownStyle = ComboBoxStyle.DropDownList; this.cmbMode.FormattingEnabled = true;
+            this.cmbMode.Items.AddRange(new object[] { "Team Render（看门狗）", "Cinema 4D（单帧）", "Commandline（单帧）" });
+            this.cmbMode.Name = "cmbMode"; this.cmbMode.Size = new Size(200, 25); this.cmbMode.Margin = new Padding(3, 9, 8, 3);
 
-            // btnStart
-            this.btnStart.Location = new System.Drawing.Point(312, 14);
-            this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(84, 28);
-            this.btnStart.Text = "启动";
-            this.btnStart.UseVisualStyleBackColor = true;
+            this.btnStart.Name = "btnStart"; this.btnStart.Size = new Size(84, 28); this.btnStart.Text = "启动"; this.btnStart.UseVisualStyleBackColor = true; this.btnStart.Margin = new Padding(3, 8, 3, 3);
+            this.btnStop.Enabled = false; this.btnStop.Name = "btnStop"; this.btnStop.Size = new Size(84, 28); this.btnStop.Text = "停止"; this.btnStop.UseVisualStyleBackColor = true; this.btnStop.Margin = new Padding(3, 8, 12, 3);
+            this.lblStatusDot.BackColor = Color.Gray; this.lblStatusDot.BorderStyle = BorderStyle.FixedSingle;
+            this.lblStatusDot.Name = "lblStatusDot"; this.lblStatusDot.Size = new Size(18, 18); this.lblStatusDot.Margin = new Padding(3, 12, 3, 3);
+            this.lblStatusText.AutoSize = true; this.lblStatusText.Name = "lblStatusText"; this.lblStatusText.Text = "已停止"; this.lblStatusText.Margin = new Padding(3, 13, 12, 3);
+            this.progressBar.Name = "progressBar"; this.progressBar.Size = new Size(150, 20); this.progressBar.Visible = false; this.progressBar.Margin = new Padding(3, 12, 8, 3);
+            this.chkKeepAwake.AutoSize = true; this.chkKeepAwake.Checked = true; this.chkKeepAwake.CheckState = CheckState.Checked;
+            this.chkKeepAwake.Name = "chkKeepAwake"; this.chkKeepAwake.Text = "阻止睡眠"; this.chkKeepAwake.UseVisualStyleBackColor = true; this.chkKeepAwake.Margin = new Padding(3, 13, 12, 3);
+            this.lblLang.AutoSize = true; this.lblLang.TextAlign = ContentAlignment.MiddleCenter;
+            this.lblLang.Name = "lblLang"; this.lblLang.Text = "语言"; this.lblLang.Margin = new Padding(3, 13, 4, 3);
+            this.cmbLang.DropDownStyle = ComboBoxStyle.DropDownList; this.cmbLang.FormattingEnabled = true;
+            this.cmbLang.Name = "cmbLang"; this.cmbLang.Size = new Size(130, 25); this.cmbLang.Margin = new Padding(3, 9, 3, 3);
 
-            // btnStop
-            this.btnStop.Enabled = false;
-            this.btnStop.Location = new System.Drawing.Point(404, 14);
-            this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(84, 28);
-            this.btnStop.Text = "停止";
-            this.btnStop.UseVisualStyleBackColor = true;
-
-            // lblStatusDot
-            this.lblStatusDot.BackColor = System.Drawing.Color.Gray;
-            this.lblStatusDot.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.lblStatusDot.Location = new System.Drawing.Point(500, 19);
-            this.lblStatusDot.Name = "lblStatusDot";
-            this.lblStatusDot.Size = new System.Drawing.Size(18, 18);
-
-            // lblStatusText
-            this.lblStatusText.AutoSize = true;
-            this.lblStatusText.Location = new System.Drawing.Point(526, 20);
-            this.lblStatusText.Name = "lblStatusText";
-            this.lblStatusText.Text = "已停止";
-
-            // progressBar
-            this.progressBar.Location = new System.Drawing.Point(600, 18);
-            this.progressBar.Name = "progressBar";
-            this.progressBar.Size = new System.Drawing.Size(160, 20);
-            this.progressBar.Visible = false;
-
-            // chkKeepAwake
-            this.chkKeepAwake.AutoSize = true;
-            this.chkKeepAwake.Checked = true;
-            this.chkKeepAwake.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkKeepAwake.Location = new System.Drawing.Point(772, 20);
-            this.chkKeepAwake.Name = "chkKeepAwake";
-            this.chkKeepAwake.Text = "阻止睡眠";
-            this.chkKeepAwake.UseVisualStyleBackColor = true;
-
-            // lblLang
-            this.lblLang.AutoSize = false;
-            this.lblLang.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.lblLang.Location = new System.Drawing.Point(884, 20);
-            this.lblLang.Name = "lblLang";
-            this.lblLang.Size = new System.Drawing.Size(90, 17);
-            this.lblLang.Text = "语言";
-
-            // cmbLang
-            this.cmbLang.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbLang.FormattingEnabled = true;
-            this.cmbLang.Location = new System.Drawing.Point(974, 16);
-            this.cmbLang.Name = "cmbLang";
-            this.cmbLang.Size = new System.Drawing.Size(130, 25);
-
-            // panelParams
+            // panelParams（左侧参数列，超高自动滚动）
             this.panelParams.Controls.Add(this.grpTeamRender);
             this.panelParams.Controls.Add(this.grpFrame);
-            this.panelParams.Location = new System.Drawing.Point(0, 56);
+            this.panelParams.Dock = DockStyle.Left;
+            this.panelParams.AutoScroll = true;
             this.panelParams.Name = "panelParams";
-            this.panelParams.Size = new System.Drawing.Size(574, 606);
+            this.panelParams.Size = new Size(568, 616);
 
-            // grpTeamRender
-            this.grpTeamRender.Controls.Add(this.lblTrExe);
-            this.grpTeamRender.Controls.Add(this.txtTrExe);
-            this.grpTeamRender.Controls.Add(this.btnTrExe);
-            this.grpTeamRender.Controls.Add(this.lblTrProc);
-            this.grpTeamRender.Controls.Add(this.txtTrProc);
-            this.grpTeamRender.Controls.Add(this.lblTrPort);
-            this.grpTeamRender.Controls.Add(this.numTrPort);
-            this.grpTeamRender.Controls.Add(this.lblTrInterval);
-            this.grpTeamRender.Controls.Add(this.numTrInterval);
-            this.grpTeamRender.Controls.Add(this.lblTrHang);
-            this.grpTeamRender.Controls.Add(this.numTrHang);
-            this.grpTeamRender.Controls.Add(this.lblTrWork);
-            this.grpTeamRender.Controls.Add(this.numTrWork);
-            this.grpTeamRender.Controls.Add(this.lblTrRest);
-            this.grpTeamRender.Controls.Add(this.numTrRest);
-            this.grpTeamRender.Controls.Add(this.lblTrReport);
-            this.grpTeamRender.Controls.Add(this.txtTrReport);
-            this.grpTeamRender.Controls.Add(this.btnTrReport);
-            this.grpTeamRender.Controls.Add(this.lblTrCache);
-            this.grpTeamRender.Controls.Add(this.txtTrCache);
-            this.grpTeamRender.Controls.Add(this.btnTrCache);
-            this.grpTeamRender.Controls.Add(this.chkTrClearCache);
-            this.grpTeamRender.Location = new System.Drawing.Point(8, 6);
+            // grpTeamRender：TableLayout [AutoSize | 100% | AutoSize]，一字段一行
+            this.grpTeamRender.Dock = DockStyle.Fill;
             this.grpTeamRender.Name = "grpTeamRender";
-            this.grpTeamRender.Size = new System.Drawing.Size(560, 420);
             this.grpTeamRender.Text = "Team Render 参数";
+            this.grpTeamRender.Padding = new Padding(10, 6, 10, 8);
+            this.grpTeamRender.Controls.Add(this.pnlTrScroll);
 
-            // Team Render rows
-            this.lblTrExe.AutoSize = true; this.lblTrExe.Location = new System.Drawing.Point(14, 32); this.lblTrExe.Name = "lblTrExe"; this.lblTrExe.Text = "主程序路径";
-            this.txtTrExe.Location = new System.Drawing.Point(210, 28); this.txtTrExe.Name = "txtTrExe"; this.txtTrExe.Size = new System.Drawing.Size(300, 23);
-            this.btnTrExe.Location = new System.Drawing.Point(514, 27); this.btnTrExe.Name = "btnTrExe"; this.btnTrExe.Size = new System.Drawing.Size(30, 25); this.btnTrExe.Text = "…"; this.btnTrExe.UseVisualStyleBackColor = true;
+            this.pnlTrScroll.Dock = DockStyle.Fill; this.pnlTrScroll.AutoScroll = true; this.pnlTrScroll.Name = "pnlTrScroll";
+            this.pnlTrScroll.Controls.Add(this.tflTr);
 
-            this.lblTrProc.AutoSize = true; this.lblTrProc.Location = new System.Drawing.Point(14, 64); this.lblTrProc.Name = "lblTrProc"; this.lblTrProc.Text = "进程名称";
-            this.txtTrProc.Location = new System.Drawing.Point(210, 60); this.txtTrProc.Name = "txtTrProc"; this.txtTrProc.Size = new System.Drawing.Size(334, 23);
+            this.tflTr.Dock = DockStyle.Top; this.tflTr.Name = "tflTr"; this.tflTr.AutoSize = true;
+            this.tflTr.ColumnCount = 3;
+            this.tflTr.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            this.tflTr.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            this.tflTr.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            for (int i = 0; i < 10; i++) this.tflTr.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            this.lblTrReport.AutoSize = true; this.lblTrReport.Location = new System.Drawing.Point(14, 96); this.lblTrReport.Name = "lblTrReport"; this.lblTrReport.Text = "异常记录文件";
-            this.txtTrReport.Location = new System.Drawing.Point(210, 92); this.txtTrReport.Name = "txtTrReport"; this.txtTrReport.Size = new System.Drawing.Size(300, 23);
-            this.btnTrReport.Location = new System.Drawing.Point(514, 91); this.btnTrReport.Name = "btnTrReport"; this.btnTrReport.Size = new System.Drawing.Size(30, 25); this.btnTrReport.Text = "…"; this.btnTrReport.UseVisualStyleBackColor = true;
+            this.lblTrExe = MakeLabel("lblTrExe", "主程序路径"); this.tflTr.Controls.Add(this.lblTrExe, 0, 0);
+            this.txtTrExe = MakeText(); this.tflTr.Controls.Add(this.txtTrExe, 1, 0);
+            this.btnTrExe = MakeBrowse(); this.btnTrExe.Name = "btnTrExe"; this.tflTr.Controls.Add(this.btnTrExe, 2, 0);
 
-            this.lblTrCache.AutoSize = true; this.lblTrCache.Location = new System.Drawing.Point(14, 128); this.lblTrCache.Name = "lblTrCache"; this.lblTrCache.Text = "缓存目录";
-            this.txtTrCache.Location = new System.Drawing.Point(210, 124); this.txtTrCache.Name = "txtTrCache"; this.txtTrCache.Size = new System.Drawing.Size(300, 23);
-            this.btnTrCache.Location = new System.Drawing.Point(514, 123); this.btnTrCache.Name = "btnTrCache"; this.btnTrCache.Size = new System.Drawing.Size(30, 25); this.btnTrCache.Text = "…"; this.btnTrCache.UseVisualStyleBackColor = true;
+            this.lblTrProc = MakeLabel("lblTrProc", "进程名称"); this.tflTr.Controls.Add(this.lblTrProc, 0, 1);
+            this.txtTrProc = MakeText(); this.tflTr.Controls.Add(this.txtTrProc, 1, 1); this.tflTr.SetColumnSpan(this.txtTrProc, 2);
 
-            this.lblTrPort.AutoSize = true; this.lblTrPort.Location = new System.Drawing.Point(14, 160); this.lblTrPort.Name = "lblTrPort"; this.lblTrPort.Text = "端口";
-            this.numTrPort.Location = new System.Drawing.Point(210, 156); this.numTrPort.Name = "numTrPort"; this.numTrPort.Size = new System.Drawing.Size(110, 23);
+            this.lblTrReport = MakeLabel("lblTrReport", "异常记录文件"); this.tflTr.Controls.Add(this.lblTrReport, 0, 2);
+            this.txtTrReport = MakeText(); this.tflTr.Controls.Add(this.txtTrReport, 1, 2);
+            this.btnTrReport = MakeBrowse(); this.btnTrReport.Name = "btnTrReport"; this.tflTr.Controls.Add(this.btnTrReport, 2, 2);
 
-            this.lblTrInterval.AutoSize = true; this.lblTrInterval.Location = new System.Drawing.Point(14, 192); this.lblTrInterval.Name = "lblTrInterval"; this.lblTrInterval.Text = "检查间隔(秒)";
-            this.numTrInterval.Location = new System.Drawing.Point(210, 188); this.numTrInterval.Name = "numTrInterval"; this.numTrInterval.Size = new System.Drawing.Size(110, 23);
+            this.lblTrCache = MakeLabel("lblTrCache", "缓存目录"); this.tflTr.Controls.Add(this.lblTrCache, 0, 3);
+            this.txtTrCache = MakeText(); this.tflTr.Controls.Add(this.txtTrCache, 1, 3);
+            this.btnTrCache = MakeBrowse(); this.btnTrCache.Name = "btnTrCache"; this.tflTr.Controls.Add(this.btnTrCache, 2, 3);
 
-            this.lblTrHang.AutoSize = true; this.lblTrHang.Location = new System.Drawing.Point(14, 224); this.lblTrHang.Name = "lblTrHang"; this.lblTrHang.Text = "最大挂起次数";
-            this.numTrHang.Location = new System.Drawing.Point(210, 220); this.numTrHang.Name = "numTrHang"; this.numTrHang.Size = new System.Drawing.Size(110, 23);
+            this.lblTrPort = MakeLabel("lblTrPort", "端口"); this.tflTr.Controls.Add(this.lblTrPort, 0, 4);
+            this.numTrPort = MakeNum(120); this.numTrPort.Name = "numTrPort"; this.tflTr.Controls.Add(this.numTrPort, 1, 4);
 
-            this.lblTrWork.AutoSize = true; this.lblTrWork.Location = new System.Drawing.Point(14, 256); this.lblTrWork.Name = "lblTrWork"; this.lblTrWork.Text = "连续工作(分)";
-            this.numTrWork.Location = new System.Drawing.Point(210, 252); this.numTrWork.Name = "numTrWork"; this.numTrWork.Size = new System.Drawing.Size(110, 23);
+            this.lblTrInterval = MakeLabel("lblTrInterval", "检查间隔(秒)"); this.tflTr.Controls.Add(this.lblTrInterval, 0, 5);
+            this.numTrInterval = MakeNum(120); this.numTrInterval.Name = "numTrInterval"; this.tflTr.Controls.Add(this.numTrInterval, 1, 5);
 
-            this.lblTrRest.AutoSize = true; this.lblTrRest.Location = new System.Drawing.Point(14, 288); this.lblTrRest.Name = "lblTrRest"; this.lblTrRest.Text = "休息时长(分)";
-            this.numTrRest.Location = new System.Drawing.Point(210, 284); this.numTrRest.Name = "numTrRest"; this.numTrRest.Size = new System.Drawing.Size(110, 23);
+            this.lblTrHang = MakeLabel("lblTrHang", "最大挂起次数"); this.tflTr.Controls.Add(this.lblTrHang, 0, 6);
+            this.numTrHang = MakeNum(120); this.numTrHang.Name = "numTrHang"; this.tflTr.Controls.Add(this.numTrHang, 1, 6);
 
-            this.chkTrClearCache.AutoSize = true; this.chkTrClearCache.Checked = true; this.chkTrClearCache.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkTrClearCache.Location = new System.Drawing.Point(210, 320); this.chkTrClearCache.Name = "chkTrClearCache"; this.chkTrClearCache.Text = "启动前清空缓存目录";
+            this.lblTrWork = MakeLabel("lblTrWork", "连续工作(分)"); this.tflTr.Controls.Add(this.lblTrWork, 0, 7);
+            this.numTrWork = MakeNum(120); this.numTrWork.Name = "numTrWork"; this.tflTr.Controls.Add(this.numTrWork, 1, 7);
 
-            // grpFrame
-            this.grpFrame.Controls.Add(this.lblFrExe);
-            this.grpFrame.Controls.Add(this.txtFrExe);
-            this.grpFrame.Controls.Add(this.btnFrExe);
-            this.grpFrame.Controls.Add(this.lblFrProc);
-            this.grpFrame.Controls.Add(this.txtFrProc);
-            this.grpFrame.Controls.Add(this.lblFrReport);
-            this.grpFrame.Controls.Add(this.txtFrReport);
-            this.grpFrame.Controls.Add(this.btnFrReport);
-            this.grpFrame.Controls.Add(this.lblFrCooldown);
-            this.grpFrame.Controls.Add(this.numFrCooldown);
-            this.grpFrame.Controls.Add(this.lblFrInterval);
-            this.grpFrame.Controls.Add(this.numFrInterval);
-            this.grpFrame.Controls.Add(this.lblFrRetry);
-            this.grpFrame.Controls.Add(this.numFrRetry);
-            this.grpFrame.Controls.Add(this.lblFrFail);
-            this.grpFrame.Controls.Add(this.numFrFail);
-            this.grpFrame.Controls.Add(this.lblFrOnFail);
-            this.grpFrame.Controls.Add(this.cmbFrOnFail);
-            this.grpFrame.Controls.Add(this.lblTaskList);
-            this.grpFrame.Controls.Add(this.lstTasks);
-            this.grpFrame.Controls.Add(this.btnTaskAdd);
-            this.grpFrame.Controls.Add(this.btnTaskRemove);
-            this.grpFrame.Controls.Add(this.btnTaskUp);
-            this.grpFrame.Controls.Add(this.btnTaskDown);
-            this.grpFrame.Controls.Add(this.lblTaskDetail);
-            this.grpFrame.Controls.Add(this.lblFrScene);
-            this.grpFrame.Controls.Add(this.txtFrScene);
-            this.grpFrame.Controls.Add(this.btnFrScene);
-            this.grpFrame.Controls.Add(this.lblFrOutput);
-            this.grpFrame.Controls.Add(this.txtFrOutput);
-            this.grpFrame.Controls.Add(this.btnFrOutput);
-            this.grpFrame.Controls.Add(this.lblFrStart);
-            this.grpFrame.Controls.Add(this.numFrStart);
-            this.grpFrame.Controls.Add(this.lblFrEnd);
-            this.grpFrame.Controls.Add(this.numFrEnd);
-            this.grpFrame.Controls.Add(this.lblRangeCount);
-            this.grpFrame.Controls.Add(this.lblMaxChunk);
-            this.grpFrame.Controls.Add(this.numMaxChunk);
-            this.grpFrame.Controls.Add(this.lblFrTimeout);
-            this.grpFrame.Controls.Add(this.numFrTimeout);
-            this.grpFrame.Controls.Add(this.btnFrPreview);
-            this.grpFrame.Location = new System.Drawing.Point(8, 6);
-            this.grpFrame.Name = "grpFrame";
-            this.grpFrame.Size = new System.Drawing.Size(560, 600);
-            this.grpFrame.Text = "单帧调度参数";
-            this.grpFrame.Visible = false;
+            this.lblTrRest = MakeLabel("lblTrRest", "休息时长(分)"); this.tflTr.Controls.Add(this.lblTrRest, 0, 8);
+            this.numTrRest = MakeNum(120); this.numTrRest.Name = "numTrRest"; this.tflTr.Controls.Add(this.numTrRest, 1, 8);
 
-            // ── 全局参数区 ──
-            this.lblFrExe.AutoSize = true; this.lblFrExe.Location = new System.Drawing.Point(14, 32); this.lblFrExe.Name = "lblFrExe"; this.lblFrExe.Text = "主程序路径";
-            this.txtFrExe.Location = new System.Drawing.Point(210, 28); this.txtFrExe.Name = "txtFrExe"; this.txtFrExe.Size = new System.Drawing.Size(300, 23);
-            this.btnFrExe.Location = new System.Drawing.Point(514, 27); this.btnFrExe.Name = "btnFrExe"; this.btnFrExe.Size = new System.Drawing.Size(30, 25); this.btnFrExe.Text = "…"; this.btnFrExe.UseVisualStyleBackColor = true;
+            this.chkTrClearCache.AutoSize = true; this.chkTrClearCache.Checked = true; this.chkTrClearCache.CheckState = CheckState.Checked;
+            this.chkTrClearCache.Name = "chkTrClearCache"; this.chkTrClearCache.Text = "启动前清空缓存目录"; this.chkTrClearCache.Anchor = AnchorStyles.Top | AnchorStyles.Left; this.chkTrClearCache.Margin = new Padding(3, 8, 3, 3);
+            this.tflTr.Controls.Add(this.chkTrClearCache, 1, 9); this.tflTr.SetColumnSpan(this.chkTrClearCache, 2);
 
-            this.lblFrProc.AutoSize = true; this.lblFrProc.Location = new System.Drawing.Point(14, 64); this.lblFrProc.Name = "lblFrProc"; this.lblFrProc.Text = "进程名称";
-            this.txtFrProc.Location = new System.Drawing.Point(210, 60); this.txtFrProc.Name = "txtFrProc"; this.txtFrProc.Size = new System.Drawing.Size(334, 23);
+            // grpFrame：多行 TableLayout + 任务队列面板
+            this.grpFrame.Dock = DockStyle.Fill; this.grpFrame.Name = "grpFrame"; this.grpFrame.Text = "单帧调度参数";
+            this.grpFrame.Visible = false; this.grpFrame.Padding = new Padding(10, 6, 10, 8);
+            this.grpFrame.Controls.Add(this.pnlFrameScroll);
 
-            this.lblFrReport.AutoSize = true; this.lblFrReport.Location = new System.Drawing.Point(14, 96); this.lblFrReport.Name = "lblFrReport"; this.lblFrReport.Text = "异常记录文件";
-            this.txtFrReport.Location = new System.Drawing.Point(210, 92); this.txtFrReport.Name = "txtFrReport"; this.txtFrReport.Size = new System.Drawing.Size(300, 23);
-            this.btnFrReport.Location = new System.Drawing.Point(514, 91); this.btnFrReport.Name = "btnFrReport"; this.btnFrReport.Size = new System.Drawing.Size(30, 25); this.btnFrReport.Text = "…"; this.btnFrReport.UseVisualStyleBackColor = true;
+            this.pnlFrameScroll.Dock = DockStyle.Fill; this.pnlFrameScroll.AutoScroll = true; this.pnlFrameScroll.Name = "pnlFrameScroll";
+            this.pnlFrameScroll.Controls.Add(this.tflFrame);
 
-            this.lblFrCooldown.AutoSize = true; this.lblFrCooldown.Location = new System.Drawing.Point(14, 128); this.lblFrCooldown.Name = "lblFrCooldown"; this.lblFrCooldown.Text = "帧间冷却(秒)";
-            this.numFrCooldown.Location = new System.Drawing.Point(150, 124); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Size = new System.Drawing.Size(70, 23);
-            this.lblFrInterval.AutoSize = true; this.lblFrInterval.Location = new System.Drawing.Point(250, 128); this.lblFrInterval.Name = "lblFrInterval"; this.lblFrInterval.Text = "检查间隔(秒)";
-            this.numFrInterval.Location = new System.Drawing.Point(370, 124); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Size = new System.Drawing.Size(70, 23);
+            this.tflFrame.Dock = DockStyle.Top; this.tflFrame.Name = "tflFrame"; this.tflFrame.AutoSize = true;
+            this.tflFrame.ColumnCount = 3;
+            this.tflFrame.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 165F)); // 标签列固定宽，使文本框/数字框/下拉统一从 x=150 起（中英对齐）
+            this.tflFrame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            this.tflFrame.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            for (int i = 0; i < 14; i++) this.tflFrame.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            this.tflFrame.RowStyles[7] = new RowStyle(SizeType.Absolute, 140F); // 任务列表行
 
-            this.lblFrRetry.AutoSize = true; this.lblFrRetry.Location = new System.Drawing.Point(14, 160); this.lblFrRetry.Name = "lblFrRetry"; this.lblFrRetry.Text = "最大异常次数";
-            this.numFrRetry.Location = new System.Drawing.Point(150, 156); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Size = new System.Drawing.Size(70, 23);
-            this.lblFrFail.AutoSize = true; this.lblFrFail.Location = new System.Drawing.Point(250, 160); this.lblFrFail.Name = "lblFrFail"; this.lblFrFail.Text = "帧最大失败";
-            this.numFrFail.Location = new System.Drawing.Point(370, 156); this.numFrFail.Name = "numFrFail"; this.numFrFail.Size = new System.Drawing.Size(70, 23);
+            this.lblFrExe = MakeLabel("lblFrExe", "主程序路径"); this.tflFrame.Controls.Add(this.lblFrExe, 0, 0);
+            this.txtFrExe = MakeText(); this.tflFrame.Controls.Add(this.txtFrExe, 1, 0);
+            this.btnFrExe = MakeBrowse(); this.btnFrExe.Name = "btnFrExe"; this.tflFrame.Controls.Add(this.btnFrExe, 2, 0);
 
-            this.lblFrOnFail.AutoSize = true; this.lblFrOnFail.Location = new System.Drawing.Point(14, 192); this.lblFrOnFail.Name = "lblFrOnFail"; this.lblFrOnFail.Text = "失败时";
-            this.cmbFrOnFail.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbFrOnFail.FormattingEnabled = true;
-            this.cmbFrOnFail.Items.AddRange(new object[] { "停止并告警", "跳过继续" });
-            this.cmbFrOnFail.Location = new System.Drawing.Point(150, 188); this.cmbFrOnFail.Name = "cmbFrOnFail"; this.cmbFrOnFail.Size = new System.Drawing.Size(160, 25);
+            this.lblFrProc = MakeLabel("lblFrProc", "进程名称"); this.tflFrame.Controls.Add(this.lblFrProc, 0, 1);
+            this.txtFrProc = MakeText(); this.tflFrame.Controls.Add(this.txtFrProc, 1, 1); this.tflFrame.SetColumnSpan(this.txtFrProc, 2);
 
-            // ── 任务队列区 ──
-            this.lblTaskList.AutoSize = true; this.lblTaskList.Location = new System.Drawing.Point(14, 224); this.lblTaskList.Name = "lblTaskList"; this.lblTaskList.Text = "任务队列"; this.lblTaskList.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
-            this.lstTasks.Location = new System.Drawing.Point(14, 246); this.lstTasks.Name = "lstTasks"; this.lstTasks.Size = new System.Drawing.Size(470, 122);
-            this.lstTasks.IntegralHeight = false;
-            this.lstTasks.SelectionMode = System.Windows.Forms.SelectionMode.One;
-            this.btnTaskAdd.Location = new System.Drawing.Point(492, 246); this.btnTaskAdd.Name = "btnTaskAdd"; this.btnTaskAdd.Size = new System.Drawing.Size(30, 26); this.btnTaskAdd.Text = "+"; this.btnTaskAdd.UseVisualStyleBackColor = true;
-            this.btnTaskRemove.Location = new System.Drawing.Point(492, 280); this.btnTaskRemove.Name = "btnTaskRemove"; this.btnTaskRemove.Size = new System.Drawing.Size(30, 26); this.btnTaskRemove.Text = "-"; this.btnTaskRemove.UseVisualStyleBackColor = true;
-            this.btnTaskUp.Location = new System.Drawing.Point(492, 314); this.btnTaskUp.Name = "btnTaskUp"; this.btnTaskUp.Size = new System.Drawing.Size(30, 26); this.btnTaskUp.Text = "↑"; this.btnTaskUp.UseVisualStyleBackColor = true;
-            this.btnTaskDown.Location = new System.Drawing.Point(492, 348); this.btnTaskDown.Name = "btnTaskDown"; this.btnTaskDown.Size = new System.Drawing.Size(30, 26); this.btnTaskDown.Text = "↓"; this.btnTaskDown.UseVisualStyleBackColor = true;
+            this.lblFrReport = MakeLabel("lblFrReport", "异常记录文件"); this.tflFrame.Controls.Add(this.lblFrReport, 0, 2);
+            this.txtFrReport = MakeText(); this.tflFrame.Controls.Add(this.txtFrReport, 1, 2);
+            this.btnFrReport = MakeBrowse(); this.btnFrReport.Name = "btnFrReport"; this.tflFrame.Controls.Add(this.btnFrReport, 2, 2);
 
-            // ── 选中任务参数区 ──
-            this.lblTaskDetail.AutoSize = true; this.lblTaskDetail.Location = new System.Drawing.Point(14, 378); this.lblTaskDetail.Name = "lblTaskDetail"; this.lblTaskDetail.Text = "选中任务参数"; this.lblTaskDetail.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F, System.Drawing.FontStyle.Bold);
+            // 冷却 + 检查间隔：2×2 第一行（普通 Panel + 绝对坐标，确定性渲染）
+            var pnlPair1 = new Panel(); pnlPair1.Name = "pnlPair1"; pnlPair1.AutoSize = false; pnlPair1.Size = new Size(540, 28); pnlPair1.Margin = new Padding(3, 4, 3, 3);
+            this.lblFrCooldown = MakeLabel("lblFrCooldown", "帧间冷却(秒)"); this.lblFrCooldown.Location = new Point(0, 6); this.lblFrCooldown.Margin = new Padding(0);
+            this.numFrCooldown = MakeNum(90); this.numFrCooldown.Name = "numFrCooldown"; this.numFrCooldown.Location = new Point(165, 3); this.numFrCooldown.Margin = new Padding(0);
+            this.lblFrInterval = MakeLabel("lblFrInterval", "检查间隔(秒)"); this.lblFrInterval.Location = new Point(275, 6); this.lblFrInterval.Margin = new Padding(0);
+            this.numFrInterval = MakeNum(90); this.numFrInterval.Name = "numFrInterval"; this.numFrInterval.Location = new Point(445, 3); this.numFrInterval.Margin = new Padding(0);
+            pnlPair1.Controls.Add(this.lblFrCooldown); pnlPair1.Controls.Add(this.numFrCooldown);
+            pnlPair1.Controls.Add(this.lblFrInterval); pnlPair1.Controls.Add(this.numFrInterval);
+            this.tflFrame.Controls.Add(pnlPair1, 0, 3); this.tflFrame.SetColumnSpan(pnlPair1, 3);
 
-            this.lblFrScene.AutoSize = true; this.lblFrScene.Location = new System.Drawing.Point(14, 406); this.lblFrScene.Name = "lblFrScene"; this.lblFrScene.Text = "工程文件";
-            this.txtFrScene.Location = new System.Drawing.Point(210, 402); this.txtFrScene.Name = "txtFrScene"; this.txtFrScene.Size = new System.Drawing.Size(300, 23);
-            this.btnFrScene.Location = new System.Drawing.Point(514, 401); this.btnFrScene.Name = "btnFrScene"; this.btnFrScene.Size = new System.Drawing.Size(30, 25); this.btnFrScene.Text = "…"; this.btnFrScene.UseVisualStyleBackColor = true;
+            // 最大异常 + 帧最大失败：2×2 第二行
+            var pnlPair2 = new Panel(); pnlPair2.Name = "pnlPair2"; pnlPair2.AutoSize = false; pnlPair2.Size = new Size(540, 28); pnlPair2.Margin = new Padding(3, 4, 3, 3);
+            this.lblFrRetry = MakeLabel("lblFrRetry", "最大异常次数"); this.lblFrRetry.Location = new Point(0, 6); this.lblFrRetry.Margin = new Padding(0);
+            this.numFrRetry = MakeNum(90); this.numFrRetry.Name = "numFrRetry"; this.numFrRetry.Location = new Point(165, 3); this.numFrRetry.Margin = new Padding(0);
+            this.lblFrFail = MakeLabel("lblFrFail", "帧最大失败"); this.lblFrFail.Location = new Point(275, 6); this.lblFrFail.Margin = new Padding(0);
+            this.numFrFail = MakeNum(90); this.numFrFail.Name = "numFrFail"; this.numFrFail.Location = new Point(445, 3); this.numFrFail.Margin = new Padding(0);
+            pnlPair2.Controls.Add(this.lblFrRetry); pnlPair2.Controls.Add(this.numFrRetry);
+            pnlPair2.Controls.Add(this.lblFrFail); pnlPair2.Controls.Add(this.numFrFail);
+            this.tflFrame.Controls.Add(pnlPair2, 0, 4); this.tflFrame.SetColumnSpan(pnlPair2, 3);
 
-            this.lblFrOutput.AutoSize = true; this.lblFrOutput.Location = new System.Drawing.Point(14, 438); this.lblFrOutput.Name = "lblFrOutput"; this.lblFrOutput.Text = "输出模板";
-            this.txtFrOutput.Location = new System.Drawing.Point(210, 434); this.txtFrOutput.Name = "txtFrOutput"; this.txtFrOutput.Size = new System.Drawing.Size(300, 23);
-            this.btnFrOutput.Location = new System.Drawing.Point(514, 433); this.btnFrOutput.Name = "btnFrOutput"; this.btnFrOutput.Size = new System.Drawing.Size(30, 25); this.btnFrOutput.Text = "…"; this.btnFrOutput.UseVisualStyleBackColor = true;
+            // 失败时
+            this.lblFrOnFail = MakeLabel("lblFrOnFail", "失败时"); this.tflFrame.Controls.Add(this.lblFrOnFail, 0, 5);
+            this.cmbFrOnFail.DropDownStyle = ComboBoxStyle.DropDownList; this.cmbFrOnFail.FormattingEnabled = true;
+            this.cmbFrOnFail.Items.AddRange(new object[] { "停止并告警", "跳过继续" }); this.cmbFrOnFail.Name = "cmbFrOnFail";
+            this.cmbFrOnFail.Size = new Size(180, 25); this.cmbFrOnFail.Anchor = AnchorStyles.Top | AnchorStyles.Left; this.cmbFrOnFail.Margin = new Padding(3, 6, 3, 3);
+            this.tflFrame.Controls.Add(this.cmbFrOnFail, 1, 5);
 
-            this.lblFrStart.AutoSize = true; this.lblFrStart.Location = new System.Drawing.Point(14, 470); this.lblFrStart.Name = "lblFrStart"; this.lblFrStart.Text = "帧范围(起~止)";
-            this.numFrStart.Location = new System.Drawing.Point(210, 466); this.numFrStart.Name = "numFrStart"; this.numFrStart.Size = new System.Drawing.Size(80, 23);
-            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Location = new System.Drawing.Point(294, 470); this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~";
-            this.numFrEnd.Location = new System.Drawing.Point(312, 466); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Size = new System.Drawing.Size(80, 23);
-            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = System.Drawing.Color.Gray; this.lblRangeCount.Location = new System.Drawing.Point(406, 470); this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧";
+            this.lblTaskList = MakeHeader("lblTaskList", "任务队列"); this.tflFrame.Controls.Add(this.lblTaskList, 0, 6); this.tflFrame.SetColumnSpan(this.lblTaskList, 3);
 
-            this.lblMaxChunk.AutoSize = true; this.lblMaxChunk.Location = new System.Drawing.Point(14, 502); this.lblMaxChunk.Name = "lblMaxChunk"; this.lblMaxChunk.Text = "最大分块长度";
-            this.numMaxChunk.Location = new System.Drawing.Point(210, 498); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Size = new System.Drawing.Size(110, 23);
+            // 任务列表面板（列表填充 + 右侧竖排按钮），row 7 固定高
+            this.pnlTaskList.Dock = DockStyle.Fill; this.pnlTaskList.Name = "pnlTaskList"; this.pnlTaskList.Margin = new Padding(3, 3, 3, 6);
+            this.tflFrame.Controls.Add(this.pnlTaskList, 0, 7); this.tflFrame.SetColumnSpan(this.pnlTaskList, 3);
+            this.lstTasks.Dock = DockStyle.Fill; this.lstTasks.Name = "lstTasks"; this.lstTasks.IntegralHeight = false; this.lstTasks.SelectionMode = SelectionMode.One;
+            this.tflTaskBtns.Dock = DockStyle.Right; this.tflTaskBtns.Name = "tflTaskBtns"; this.tflTaskBtns.RowCount = 4; this.tflTaskBtns.ColumnCount = 1;
+            this.tflTaskBtns.AutoSize = true; this.tflTaskBtns.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            this.tflTaskBtns.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            for (int i = 0; i < 4; i++) this.tflTaskBtns.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            this.btnTaskAdd = MakeToolBtn("btnTaskAdd", "+"); this.btnTaskRemove = MakeToolBtn("btnTaskRemove", "-");
+            this.btnTaskUp = MakeToolBtn("btnTaskUp", "↑"); this.btnTaskDown = MakeToolBtn("btnTaskDown", "↓");
+            this.tflTaskBtns.Controls.Add(this.btnTaskAdd, 0, 0);
+            this.tflTaskBtns.Controls.Add(this.btnTaskRemove, 0, 1);
+            this.tflTaskBtns.Controls.Add(this.btnTaskUp, 0, 2);
+            this.tflTaskBtns.Controls.Add(this.btnTaskDown, 0, 3);
+            this.pnlTaskList.Controls.Add(this.lstTasks);
+            this.pnlTaskList.Controls.Add(this.tflTaskBtns);
+            this.lstTasks.BringToFront();
 
-            this.lblFrTimeout.AutoSize = true; this.lblFrTimeout.Location = new System.Drawing.Point(14, 534); this.lblFrTimeout.Name = "lblFrTimeout"; this.lblFrTimeout.Text = "无进展超时(秒)";
-            this.numFrTimeout.Location = new System.Drawing.Point(210, 530); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Size = new System.Drawing.Size(110, 23);
+            this.lblTaskDetail = MakeHeader("lblTaskDetail", "选中任务参数"); this.tflFrame.Controls.Add(this.lblTaskDetail, 0, 8); this.tflFrame.SetColumnSpan(this.lblTaskDetail, 3);
 
-            this.btnFrPreview.Location = new System.Drawing.Point(210, 564); this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Size = new System.Drawing.Size(290, 26);
-            this.btnFrPreview.Text = "预览输出文件名并校验目录"; this.btnFrPreview.UseVisualStyleBackColor = true;
+            this.lblFrScene = MakeLabel("lblFrScene", "工程文件"); this.tflFrame.Controls.Add(this.lblFrScene, 0, 9);
+            this.txtFrScene = MakeText(); this.tflFrame.Controls.Add(this.txtFrScene, 1, 9);
+            this.btnFrScene = MakeBrowse(); this.btnFrScene.Name = "btnFrScene"; this.tflFrame.Controls.Add(this.btnFrScene, 2, 9);
 
-            // panelLog
+            this.lblFrOutput = MakeLabel("lblFrOutput", "输出模板"); this.tflFrame.Controls.Add(this.lblFrOutput, 0, 10);
+            this.txtFrOutput = MakeText(); this.tflFrame.Controls.Add(this.txtFrOutput, 1, 10);
+            this.btnFrOutput = MakeBrowse(); this.btnFrOutput.Name = "btnFrOutput"; this.tflFrame.Controls.Add(this.btnFrOutput, 2, 10);
+
+            // 帧范围行：普通 Panel + 绝对坐标，加大 ~ 与输入框间距，row 11
+            this.lblFrStart = MakeLabel("lblFrStart", "帧范围(起~止)"); this.tflFrame.Controls.Add(this.lblFrStart, 0, 11);
+            this.pnlRange.Name = "pnlRange"; this.pnlRange.AutoSize = false; this.pnlRange.Size = new Size(380, 28); this.pnlRange.Margin = new Padding(0, 4, 0, 0);
+            this.numFrStart = MakeNum(80); this.numFrStart.Name = "numFrStart"; this.numFrStart.Location = new Point(0, 2);
+            this.lblFrEnd.AutoSize = true; this.lblFrEnd.Name = "lblFrEnd"; this.lblFrEnd.Text = "~"; this.lblFrEnd.Location = new Point(92, 5);
+            this.numFrEnd = MakeNum(80); this.numFrEnd.Name = "numFrEnd"; this.numFrEnd.Location = new Point(116, 2);
+            this.lblRangeCount.AutoSize = true; this.lblRangeCount.ForeColor = Color.Gray; this.lblRangeCount.Name = "lblRangeCount"; this.lblRangeCount.Text = "共 0 帧"; this.lblRangeCount.Location = new Point(210, 5);
+            this.pnlRange.Controls.Add(this.numFrStart);
+            this.pnlRange.Controls.Add(this.lblFrEnd);
+            this.pnlRange.Controls.Add(this.numFrEnd);
+            this.pnlRange.Controls.Add(this.lblRangeCount);
+            this.tflFrame.Controls.Add(this.pnlRange, 1, 11); this.tflFrame.SetColumnSpan(this.pnlRange, 2);
+
+            // 最大分块 + 无进展超时：并排一行（普通 Panel + 绝对坐标），row 12
+            var pnlPair3 = new Panel(); pnlPair3.Name = "pnlPair3"; pnlPair3.AutoSize = false; pnlPair3.Size = new Size(540, 28); pnlPair3.Margin = new Padding(3, 4, 3, 3);
+            this.lblMaxChunk = MakeLabel("lblMaxChunk", "最大分块长度"); this.lblMaxChunk.Location = new Point(0, 6); this.lblMaxChunk.Margin = new Padding(0);
+            this.numMaxChunk = MakeNum(90); this.numMaxChunk.Name = "numMaxChunk"; this.numMaxChunk.Location = new Point(165, 3); this.numMaxChunk.Margin = new Padding(0);
+            this.lblFrTimeout = MakeLabel("lblFrTimeout", "无进展超时(秒)"); this.lblFrTimeout.Location = new Point(275, 6); this.lblFrTimeout.Margin = new Padding(0);
+            this.numFrTimeout = MakeNum(90); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Location = new Point(445, 3); this.numFrTimeout.Margin = new Padding(0);
+            pnlPair3.Controls.Add(this.lblMaxChunk); pnlPair3.Controls.Add(this.numMaxChunk);
+            pnlPair3.Controls.Add(this.lblFrTimeout); pnlPair3.Controls.Add(this.numFrTimeout);
+            this.tflFrame.Controls.Add(pnlPair3, 0, 12); this.tflFrame.SetColumnSpan(pnlPair3, 3);
+
+            this.btnFrPreview.AutoSize = true; this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Text = "预览输出文件名并校验目录";
+            this.btnFrPreview.UseVisualStyleBackColor = true; this.btnFrPreview.Anchor = AnchorStyles.Top | AnchorStyles.Left; this.btnFrPreview.Margin = new Padding(3, 8, 3, 3);
+            this.tflFrame.Controls.Add(this.btnFrPreview, 1, 13); this.tflFrame.SetColumnSpan(this.btnFrPreview, 2);
+
+            // panelLog：顶部 Padding 预留标题行，标题/清空按钮作锚定子控件，rtbLog 用 Dock.Fill 落在 Padding 之下
+            // （不依赖子面板 z-order，首帧即对齐，无需缩放窗口才归位）
+            this.panelLog.Dock = DockStyle.Fill;
+            this.panelLog.Padding = new Padding(8, 34, 8, 8);
+            this.panelLog.Name = "panelLog";
+            this.panelLog.Size = new Size(532, 616);
+            this.panelLog.Controls.Add(this.rtbLog);
             this.panelLog.Controls.Add(this.lblLogTitle);
             this.panelLog.Controls.Add(this.btnClearLog);
-            this.panelLog.Controls.Add(this.rtbLog);
-            this.panelLog.Location = new System.Drawing.Point(582, 56);
-            this.panelLog.Name = "panelLog";
-            this.panelLog.Size = new System.Drawing.Size(540, 606);
 
-            this.lblLogTitle.AutoSize = true;
-            this.lblLogTitle.Location = new System.Drawing.Point(12, 8);
-            this.lblLogTitle.Name = "lblLogTitle";
-            this.lblLogTitle.Text = "运行日志";
+            this.lblLogTitle.AutoSize = true; this.lblLogTitle.Location = new Point(8, 8); this.lblLogTitle.Name = "lblLogTitle"; this.lblLogTitle.Text = "运行日志"; this.lblLogTitle.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            this.btnClearLog.Name = "btnClearLog"; this.btnClearLog.Size = new Size(96, 24); this.btnClearLog.Text = "清空日志"; this.btnClearLog.UseVisualStyleBackColor = true; this.btnClearLog.Location = new Point(532 - 8 - 96, 5); this.btnClearLog.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 
-            this.btnClearLog.Location = new System.Drawing.Point(436, 6);
-            this.btnClearLog.Name = "btnClearLog";
-            this.btnClearLog.Size = new System.Drawing.Size(96, 24);
-            this.btnClearLog.Text = "清空日志";
-            this.btnClearLog.UseVisualStyleBackColor = true;
-
-            this.rtbLog.BackColor = System.Drawing.Color.White;
-            this.rtbLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.rtbLog.Location = new System.Drawing.Point(12, 30);
-            this.rtbLog.Name = "rtbLog";
-            this.rtbLog.ReadOnly = true;
-            this.rtbLog.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.rtbLog.Size = new System.Drawing.Size(516, 564);
-            this.rtbLog.WordWrap = true;
+            this.rtbLog.BackColor = Color.White; this.rtbLog.Dock = DockStyle.Fill; this.rtbLog.Font = new Font("Consolas", 9F);
+            this.rtbLog.Name = "rtbLog"; this.rtbLog.ReadOnly = true; this.rtbLog.ScrollBars = RichTextBoxScrollBars.Vertical; this.rtbLog.WordWrap = true;
 
             // MainForm
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1130, 670);
-            this.Controls.Add(this.panelTop);
-            this.Controls.Add(this.panelParams);
+            this.AutoScaleDimensions = new SizeF(7F, 17F);
+            this.AutoScaleMode = AutoScaleMode.Font;
+            this.ClientSize = new Size(1100, 672);
+            this.MinimumSize = new Size(820, 520);
             this.Controls.Add(this.panelLog);
-            this.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
+            this.Controls.Add(this.panelParams);
+            this.Controls.Add(this.panelTop);
+            this.Font = new Font("Microsoft YaHei UI", 9F);
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
             this.Name = "MainForm";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.StartPosition = FormStartPosition.CenterScreen;
             this.Text = "Render Server GUI";
 
-            this.panelTop.ResumeLayout(false);
-            this.panelTop.PerformLayout();
-            this.panelParams.ResumeLayout(false);
-            this.grpTeamRender.ResumeLayout(false);
-            this.grpTeamRender.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numTrPort)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrInterval)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrHang)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrWork)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTrRest)).EndInit();
-            this.grpFrame.ResumeLayout(false);
-            this.grpFrame.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numFrStart)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numFrEnd)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrCooldown)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numFrTimeout)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrInterval)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrRetry)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numFrFail)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numFrStart)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numFrEnd)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxChunk)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numFrTimeout)).EndInit();
             this.panelLog.ResumeLayout(false);
-            this.panelLog.PerformLayout();
+            this.pnlRange.ResumeLayout(false);
+            this.pnlRange.PerformLayout();
+            this.tflTaskBtns.ResumeLayout(false);
+            this.pnlTaskList.ResumeLayout(false);
+            this.tflFrame.ResumeLayout(false);
+            this.tflFrame.PerformLayout();
+            this.pnlFrameScroll.ResumeLayout(false);
+            this.grpFrame.ResumeLayout(false);
+            this.tflTr.ResumeLayout(false);
+            this.tflTr.PerformLayout();
+            this.pnlTrScroll.ResumeLayout(false);
+            this.grpTeamRender.ResumeLayout(false);
+            this.panelParams.ResumeLayout(false);
+            this.panelTop.ResumeLayout(false);
+            this.panelTop.PerformLayout();
             this.ResumeLayout(false);
         }
 
         #endregion
 
-        private System.Windows.Forms.Panel panelTop;
-        private System.Windows.Forms.Label lblMode;
-        private System.Windows.Forms.ComboBox cmbMode;
-        private System.Windows.Forms.Button btnStart;
-        private System.Windows.Forms.Button btnStop;
-        private System.Windows.Forms.Panel lblStatusDot;
-        private System.Windows.Forms.Label lblStatusText;
-        private System.Windows.Forms.ProgressBar progressBar;
-        private System.Windows.Forms.CheckBox chkKeepAwake;
-        private System.Windows.Forms.Label lblLang;
-        private System.Windows.Forms.ComboBox cmbLang;
+        private FlowLayoutPanel panelTop;
+        private Label lblMode;
+        private ComboBox cmbMode;
+        private Button btnStart;
+        private Button btnStop;
+        private Panel lblStatusDot;
+        private Label lblStatusText;
+        private ProgressBar progressBar;
+        private CheckBox chkKeepAwake;
+        private Label lblLang;
+        private ComboBox cmbLang;
 
-        private System.Windows.Forms.Panel panelParams;
-        private System.Windows.Forms.GroupBox grpTeamRender;
-        private System.Windows.Forms.Label lblTrExe;
-        private System.Windows.Forms.TextBox txtTrExe;
-        private System.Windows.Forms.Button btnTrExe;
-        private System.Windows.Forms.Label lblTrProc;
-        private System.Windows.Forms.TextBox txtTrProc;
-        private System.Windows.Forms.Label lblTrPort;
-        private System.Windows.Forms.NumericUpDown numTrPort;
-        private System.Windows.Forms.Label lblTrInterval;
-        private System.Windows.Forms.NumericUpDown numTrInterval;
-        private System.Windows.Forms.Label lblTrHang;
-        private System.Windows.Forms.NumericUpDown numTrHang;
-        private System.Windows.Forms.Label lblTrWork;
-        private System.Windows.Forms.NumericUpDown numTrWork;
-        private System.Windows.Forms.Label lblTrRest;
-        private System.Windows.Forms.NumericUpDown numTrRest;
-        private System.Windows.Forms.Label lblTrReport;
-        private System.Windows.Forms.TextBox txtTrReport;
-        private System.Windows.Forms.Button btnTrReport;
-        private System.Windows.Forms.Label lblTrCache;
-        private System.Windows.Forms.TextBox txtTrCache;
-        private System.Windows.Forms.Button btnTrCache;
-        private System.Windows.Forms.CheckBox chkTrClearCache;
+        private Panel panelParams;
+        private TableLayoutPanel tflTr;
+        private Panel pnlTrScroll;
+        private GroupBox grpTeamRender;
+        private Label lblTrExe;
+        private TextBox txtTrExe;
+        private Button btnTrExe;
+        private Label lblTrProc;
+        private TextBox txtTrProc;
+        private Label lblTrReport;
+        private TextBox txtTrReport;
+        private Button btnTrReport;
+        private Label lblTrCache;
+        private TextBox txtTrCache;
+        private Button btnTrCache;
+        private Label lblTrPort;
+        private NumericUpDown numTrPort;
+        private Label lblTrInterval;
+        private NumericUpDown numTrInterval;
+        private Label lblTrHang;
+        private NumericUpDown numTrHang;
+        private Label lblTrWork;
+        private NumericUpDown numTrWork;
+        private Label lblTrRest;
+        private NumericUpDown numTrRest;
+        private CheckBox chkTrClearCache;
 
-        private System.Windows.Forms.GroupBox grpFrame;
-        private System.Windows.Forms.Label lblFrExe;
-        private System.Windows.Forms.TextBox txtFrExe;
-        private System.Windows.Forms.Button btnFrExe;
-        private System.Windows.Forms.Label lblFrProc;
-        private System.Windows.Forms.TextBox txtFrProc;
-        private System.Windows.Forms.Label lblFrReport;
-        private System.Windows.Forms.TextBox txtFrReport;
-        private System.Windows.Forms.Button btnFrReport;
-        private System.Windows.Forms.Label lblFrCooldown;
-        private System.Windows.Forms.NumericUpDown numFrCooldown;
-        private System.Windows.Forms.Label lblFrInterval;
-        private System.Windows.Forms.NumericUpDown numFrInterval;
-        private System.Windows.Forms.Label lblFrRetry;
-        private System.Windows.Forms.NumericUpDown numFrRetry;
-        private System.Windows.Forms.Label lblFrFail;
-        private System.Windows.Forms.NumericUpDown numFrFail;
-        private System.Windows.Forms.Label lblFrOnFail;
-        private System.Windows.Forms.ComboBox cmbFrOnFail;
-        private System.Windows.Forms.Label lblTaskList;
-        private System.Windows.Forms.ListBox lstTasks;
-        private System.Windows.Forms.Button btnTaskAdd;
-        private System.Windows.Forms.Button btnTaskRemove;
-        private System.Windows.Forms.Button btnTaskUp;
-        private System.Windows.Forms.Button btnTaskDown;
-        private System.Windows.Forms.Label lblTaskDetail;
-        private System.Windows.Forms.Label lblFrScene;
-        private System.Windows.Forms.TextBox txtFrScene;
-        private System.Windows.Forms.Button btnFrScene;
-        private System.Windows.Forms.Label lblFrOutput;
-        private System.Windows.Forms.TextBox txtFrOutput;
-        private System.Windows.Forms.Button btnFrOutput;
-        private System.Windows.Forms.Label lblFrStart;
-        private System.Windows.Forms.NumericUpDown numFrStart;
-        private System.Windows.Forms.Label lblFrEnd;
-        private System.Windows.Forms.NumericUpDown numFrEnd;
-        private System.Windows.Forms.Label lblRangeCount;
-        private System.Windows.Forms.Label lblMaxChunk;
-        private System.Windows.Forms.NumericUpDown numMaxChunk;
-        private System.Windows.Forms.Label lblFrTimeout;
-        private System.Windows.Forms.NumericUpDown numFrTimeout;
-        private System.Windows.Forms.Button btnFrPreview;
+        private GroupBox grpFrame;
+        private TableLayoutPanel tflFrame;
+        private Panel pnlFrameScroll;
+        private Label lblFrExe;
+        private TextBox txtFrExe;
+        private Button btnFrExe;
+        private Label lblFrProc;
+        private TextBox txtFrProc;
+        private Label lblFrReport;
+        private TextBox txtFrReport;
+        private Button btnFrReport;
+        private Label lblFrCooldown;
+        private NumericUpDown numFrCooldown;
+        private Label lblFrInterval;
+        private NumericUpDown numFrInterval;
+        private Label lblFrRetry;
+        private NumericUpDown numFrRetry;
+        private Label lblFrFail;
+        private NumericUpDown numFrFail;
+        private Label lblFrOnFail;
+        private ComboBox cmbFrOnFail;
+        private Label lblTaskList;
+        private Panel pnlTaskList;
+        private ListBox lstTasks;
+        private TableLayoutPanel tflTaskBtns;
+        private Button btnTaskAdd;
+        private Button btnTaskRemove;
+        private Button btnTaskUp;
+        private Button btnTaskDown;
+        private Label lblTaskDetail;
+        private Label lblFrScene;
+        private TextBox txtFrScene;
+        private Button btnFrScene;
+        private Label lblFrOutput;
+        private TextBox txtFrOutput;
+        private Button btnFrOutput;
+        private Label lblFrStart;
+        private Panel pnlRange;
+        private NumericUpDown numFrStart;
+        private Label lblFrEnd;
+        private NumericUpDown numFrEnd;
+        private Label lblRangeCount;
+        private Label lblMaxChunk;
+        private NumericUpDown numMaxChunk;
+        private Label lblFrTimeout;
+        private NumericUpDown numFrTimeout;
+        private Button btnFrPreview;
 
-        private System.Windows.Forms.Panel panelLog;
-        private System.Windows.Forms.Label lblLogTitle;
-        private System.Windows.Forms.Button btnClearLog;
-        private System.Windows.Forms.RichTextBox rtbLog;
+        private Panel panelLog;
+        private RichTextBox rtbLog;
+        private Label lblLogTitle;
+        private Button btnClearLog;
     }
 }
