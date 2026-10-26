@@ -89,7 +89,8 @@ The queue holds at most 99 tasks; IDs are also capped at the int limit (safety g
 
 ```
 Render Server GUI/
-├─ Program.cs                  入口 + 全局异常兜底 / entry + exception handler
+├─ Program.cs                  入口 + 单例 + 全局异常兜底 / entry + single-instance + exception handler
+├─ app.manifest                PerMonitorV2 DPI 感知声明 / high-DPI awareness manifest
 ├─ Models/                     参数与配置 / parameters & config
 │  ├─ RenderMode.cs            模式枚举 / mode enum
 │  ├─ RenderTask.cs            单条渲染任务（工程/模板/范围/分块/超时）/ one render task
@@ -101,8 +102,9 @@ Render Server GUI/
 │  ├─ FrameRenderController.cs ②③ 任务队列 + 单帧/分块引擎 / task queue + per-frame & chunk engine
 │  ├─ FrameScanner.cs          命名展开与落定判定 / naming & settle checks
 │  ├─ ProcessHealth.cs         健康信号 / health signals
+│  ├─ KeepAwake.cs             渲染时阻止系统睡眠 / prevent sleep during render
 │  └─ Localizer.cs             多语言 / i18n
-├─ UI/MainForm.cs(+Designer)   界面 / UI
+├─ UI/MainForm.cs(+Designer)   界面（自适应布局）/ UI (adaptive layout)
 ├─ i18n/                       zh-CN / zh-HK / en-US
 └─ 逐帧渲染调度流程图.html       流程图 / flowchart
 ```
