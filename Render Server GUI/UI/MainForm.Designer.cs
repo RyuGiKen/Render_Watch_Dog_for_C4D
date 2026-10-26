@@ -196,8 +196,8 @@ namespace RenderServerGui.UI
             this.panelTop.MinimumSize = new Size(0, 48);
             this.panelTop.Size = new Size(1100, 48);
 
-            this.lblMode.AutoSize = false; this.lblMode.TextAlign = ContentAlignment.MiddleCenter;
-            this.lblMode.Location = new Point(12, 20); this.lblMode.Name = "lblMode"; this.lblMode.Size = new Size(48, 17); this.lblMode.Text = "模式"; this.lblMode.Margin = new Padding(4, 12, 4, 3);
+            this.lblMode.AutoSize = true; this.lblMode.TextAlign = ContentAlignment.MiddleLeft;
+            this.lblMode.Location = new Point(12, 20); this.lblMode.Name = "lblMode"; this.lblMode.Text = "模式"; this.lblMode.Margin = new Padding(4, 12, 4, 3);
 
             this.cmbMode.DropDownStyle = ComboBoxStyle.DropDownList; this.cmbMode.FormattingEnabled = true;
             this.cmbMode.Items.AddRange(new object[] { "Team Render（看门狗）", "Cinema 4D（单帧）", "Commandline（单帧）" });
@@ -403,8 +403,10 @@ namespace RenderServerGui.UI
             this.rtbLog.Name = "rtbLog"; this.rtbLog.ReadOnly = true; this.rtbLog.ScrollBars = RichTextBoxScrollBars.Vertical; this.rtbLog.WordWrap = true;
 
             // MainForm
-            this.AutoScaleDimensions = new SizeF(7F, 17F);
-            this.AutoScaleMode = AutoScaleMode.Font;
+            // 高 DPI：PerMonitorV2 下用 Dpi 缩放（按 DPI/96 等比放大控件尺寸，含高度），
+            // 避免 AutoScaleMode.Font 在 .NET FW 4.7.2 + PerMonitorV2 下因子算成 1、字体放大而控件高度不变导致文字被裁半行
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             this.ClientSize = new Size(1100, 672);
             this.MinimumSize = new Size(820, 520);
             this.Controls.Add(this.panelLog);
