@@ -88,10 +88,14 @@ namespace RenderServerGui.Models
         // ---------- 多任务队列（C4D / Commandline 专用）----------
 
         /// <summary>
-        /// 渲染任务列表，按顺序串行执行。
-        /// 旧配置文件无此节点时 Load() 会从上面6个旧字段自动迁移生成一条。
+        /// 渲染任务列表。自 v3.5 起 Cinema4D 与 Commandline **共用** AppConfig.SharedTasks 同一实例，
+        /// 此处仅作为运行时视图与旧文件读取入口；不再各自写盘（见 ShouldSerializeTasks），避免同一列表被存多份。
+        /// 旧配置文件无 Tasks 节点时由 Load() 从更旧的单任务字段迁移。
         /// </summary>
         public List<RenderTask> Tasks { get; set; }
+
+        /// <summary>XmlSerializer 条件序列化：任务列表改由 AppConfig.SharedTasks 统一持久化，这里不写出（但读取旧文件仍生效）。</summary>
+        public bool ShouldSerializeTasks() => false;
 
         /// <summary>
         /// 从旧的单任务字段迁移到 Tasks 列表（仅当 Tasks 为 null/空 且旧字段有值时）；
