@@ -95,6 +95,7 @@
     <div class="row"><span class="node layer">【最外层 · 任务队列】</span> <span class="tag">按列表顺序串行；工程/模板/帧范围/分块N/无进展超时随任务切换，其余全局共用</span></div>
     <div class="branch">
       <div class="row"><span class="edge e-sig">取任务</span><span class="node">第 k 个任务（如 <code>任务001  scene1 [0-100]</code>，主键添加时分配、删除不回收）</span></div>
+      <div class="row"><span class="edge e-sig">启动前检测</span><span class="node">工程文件不存在（路径错误/丢失/误删）→ <b>跳过该任务</b>并记日志（C4D 会打开空工程卡在非渲染状态，CPU/GPU 均低）</span></div>
       <div class="row"><span class="edge e-sig">添加限制</span><span class="node">任务数上限 <b>99</b> 个（启动校验同样拦截）；主键达 int 上限(2147483647)同理——达到即<b>拒绝添加并弹窗提示</b>（防护，正常用不到）</span></div>
       <div class="row"><span class="edge e-cool">k&gt;1 → 先等任务间冷却 = 帧间冷却 <b>60s</b>（首个任务直接开始）</span><span class="node ok">装载任务参数 → 进入【外层·逐块】</span></div>
       <div class="row"><span class="edge e-sig">任务结束（完成 / 熔断跳过）</span><span class="node dec">还有下一任务？</span><span class="edge e-now">是 → 取下一任务</span><span class="edge e-now">否 → 全部结束</span></div>

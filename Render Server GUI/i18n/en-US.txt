@@ -87,6 +87,7 @@ log.fr.taskBrief=  {2} ({0}/{1})  chunk<={3}  timeout {4}s
 log.fr.taskStart=═══ {0} ({1}/{2}) ═══
 log.fr.taskCooldown=Inter-task cooldown {0}s...
 log.fr.taskSkipped={0} skipped (circuit breaker).
+log.fr.sceneMissing=Project file not found; skipping {0}: {1}
 log.fr.taskDone={0} done: advanced {1}/{2} frame(s).
 log.fr.allDone=All {0} task(s) finished.
 log.fr.taskProgress=Task {0}/{1}

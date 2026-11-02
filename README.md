@@ -84,6 +84,8 @@ Unbaked simulations render wrong pixels from mid-range, bake first.
 Chunking saves cold starts but renders back-to-back; keep N modest.
 - 任务队列上限 99 个；主键达 int 上限同样拒绝添加（防护，正常到不了）。  
 The queue holds at most 99 tasks; IDs are also capped at the int limit (safety guard only).
+- 每个任务启动进程前检测工程文件是否存在，缺失（路径改动/丢失/误删）则跳过该任务并记日志——否则 C4D 会打开空工程卡在非渲染状态。输出模板无法从工程内读取，需靠"预览"人工核对，写错则由无进展超时兜底。  
+Each task's project file is checked before launch; a missing one (renamed/lost/deleted) skips the task with a log line — otherwise C4D opens an empty scene and stalls. The output template can't be read from inside the project, so verify it via "Preview"; a wrong one falls back to the no-progress timeout.
 
 ## 目录 / Layout
 

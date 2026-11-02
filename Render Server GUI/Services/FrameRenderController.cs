@@ -146,6 +146,14 @@ namespace RenderServerGui.Services
                 {
                     _currentTask = tasks[ti];
 
+                    // 启动进程前：工程文件必须存在。路径错误/文件丢失/误删除时 C4D 会打开空工程
+                    // 卡在非渲染状态（CPU/GPU 均低、显存不涨），此处直接跳过该任务并记日志
+                    if (string.IsNullOrWhiteSpace(_currentTask.SceneFile) || !File.Exists(_currentTask.SceneFile))
+                    {
+                        LogWarn(Localizer.Tf("log.fr.sceneMissing", "工程文件不存在，跳过 {0}：{1}", _currentTask.DisplayLabel, _currentTask.SceneFile));
+                        continue;
+                    }
+
                     // 任务间冷却（第一个任务前不等待）
                     if (ti > 0 && _p.CooldownSeconds > 0)
                     {
