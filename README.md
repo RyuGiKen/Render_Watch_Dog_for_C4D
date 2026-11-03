@@ -51,6 +51,9 @@ A Cinema 4D watchdog + multi-task per-frame/chunk render scheduler (Windows desk
 - **单实例** / Single instance  
   同一 exe 只允许运行一份，重复启动会静默退出。  
   Only one instance of the exe may run; duplicate launches exit silently.
+- **路径自动定位** / Path auto-detection  
+  主程序/异常记录路径为空或失效时，按「.c4d 文件关联 → 注册表卸载项 → Program Files 通配」只读探测（不需管理员）自动填充；异常记录按 exe 版本年份在 `%APPDATA%\Maxon` 匹配对应目录。探测不到则留空由用户浏览选择，绝不猜错路径。  
+  When the executable / crash-report path is empty or invalid, it is auto-detected read-only via .c4d file association → uninstall registry → Program Files glob (no admin); the report path is matched under %APPDATA%\Maxon by the exe's version year. If not found it stays blank for manual browse — never a guessed path.
 
 ## 多语言 / Localization
 

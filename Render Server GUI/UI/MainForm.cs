@@ -311,6 +311,35 @@ namespace RenderServerGui.UI
             ApplyModeToUi(_cfg.Mode);
         }
 
+        /// <summary>
+        /// 主程序/异常记录路径为空或失效时自动探测填充（只读、不需管理员）。
+        /// 只补空/坏值，不覆盖用户手填的有效路径；探测不到保持空，由"…"浏览手动选择。
+        /// </summary>
+        private void EnsurePathsAuto(RenderMode mode, ModeProfile p)
+        {
+            if (p == null) return;
+            if (string.IsNullOrWhiteSpace(p.ExePath) || !File.Exists(p.ExePath))
+            {
+                string exe = C4dPathLocator.FindExePath(mode);
+                if (exe != null)
+                {
+                    p.ExePath = exe;
+                    if (string.IsNullOrWhiteSpace(p.ProcessName))
+                        p.ProcessName = Path.GetFileNameWithoutExtension(exe);
+                    AppendLog(new LogEntry(LogLevel.Info, Localizer.Tf("log.fr.autoDetectExe", "已自动定位主程序：{0}", exe)));
+                }
+            }
+            if (string.IsNullOrWhiteSpace(p.ReportPath) || !Directory.Exists(Path.GetDirectoryName(p.ReportPath)))
+            {
+                string rep = C4dPathLocator.FindBugReportPath(mode);
+                if (rep != null)
+                {
+                    p.ReportPath = rep;
+                    AppendLog(new LogEntry(LogLevel.Info, Localizer.Tf("log.fr.autoDetectReport", "已自动定位异常记录：{0}", rep)));
+                }
+            }
+        }
+
         /// <summary>按模式切换分组可见性，并把该模式已存参数灌入控件。</summary>
         private void ApplyModeToUi(RenderMode mode)
         {
@@ -320,6 +349,7 @@ namespace RenderServerGui.UI
             progressBar.Visible = frame;
 
             ModeProfile p = _cfg.ProfileOf(mode);
+            EnsurePathsAuto(mode, p);   // 路径为空/失效时自动探测（只读、无管理员），找不到留空让用户浏览
             if (frame)
             {
                 // 全局参数
