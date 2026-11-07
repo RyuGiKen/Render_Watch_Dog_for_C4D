@@ -20,18 +20,29 @@ namespace RenderServerGui.Services
     /// 单帧/分块调度控制器，Cinema 4D 与 Commandline 严格共用同一段代码（差异只在 exe 与崩溃记录路径）。
     ///
     /// 分块模型（N=MaxChunkLength，≥1，执行时夹到任务范围；N=1 即单帧）：
-    ///  · 外层 WorkerLoop：单调游标 cursor 只前进。每轮先跳过"已落定"的帧，取块 [a,b]=[cursor, min(cursor+N-1,末)]，
-    ///    启动进程渲这一段；成功→cursor=b+1；崩了→重算块内第一个未落定帧 newFirst：
+    ///  · 任务启动时（无渲染进程、机器空载）一次目录枚举建立 FrameStateMap（0=范围外/1=未落定/2=已落定），
+    ///    落定口径：存在·非空·距写入≥帧间冷却（沿用 CooldownSeconds，防孤儿进程写出的半成品被误认）。
+    ///    运行期游标推进与块尾限位只查内存，不再逐帧 stat。
+    ///  · 外层 WorkerLoop：单调游标 cursor 只前进。每轮先跳过表中"已落定"的帧，取块
+    ///    [a,b]=[a, 下一个已落定帧之前，且 ≤ min(a+N-1,末)]。块尾收缩是必需的：C4D 的 -frame a b 1
+    ///    是连续区间，越过已落定帧会覆盖重渲（浪费算力且可能损坏已有成品）。
+    ///    成功→cursor=b+1 并整块置 2；失败→按块内实际产物结算状态表，再取块内首个未落定帧 newFirst：
     ///      newFirst>a 视为有进展，cursor=newFirst（重置焦点失败计数）；
     ///      newFirst==a 原地卡起点，焦点失败+1，达帧最大失败次数则跳过起点帧 cursor=a+1；
-    ///    连续多块都"原地卡起点即失败"→ 熔断跳过当前任务、继续队列下一个（防整片被静默跳过又不终止整场）。跨重启不留痕，由用户手填缺帧范围续渲。
-    ///  · 内层 RunBlock：只观察这一个进程。启动后每"检查间隔"轮询：
-    ///    块内全部落定→（进程还活着则杀）成功；已退出且有部分完成→有进展失败；
-    ///    无进展判定：落定数增加或产物文件 mtime 前进（正在写盘也算正常产出）都会重置计时；
-    ///    进程活着但持续无任何产物写入、超过"无进展超时"→ 首现记录、下一轮复查仍超时即杀（不走异常去抖）；
-    ///    已退出无产物/崩溃报告在时窗→异常计数+1，达"最大异常次数"→杀进程判异常失败；纯无响应(未超时)只提示一次、异常清零、不杀（无窗口进程恒不触发）。
+    ///    连续多块都"原地卡起点即失败"→ 熔断跳过当前任务、继续队列下一个。
+    ///  · 内层 RunBlock：只观察这一个进程。启动后每"检查间隔"做一次块内目录枚举，
+    ///    同时得到"存在且非空"帧数 written 与块内最新写入时刻：
+    ///    written 齐且进程已退出→成功；written 齐、进程仍在且写入已静默≥帧间冷却→杀进程计成功；
+    ///    written 齐但仍在写→继续轮询；已退出且只写了部分→有进展失败；
+    ///    无进展判定：written 增加或块内产物 mtime 前进都会重置计时；
+    ///    进程活着但持续无任何产物写入、超过"无进展超时"→ 首现记录、下一轮复查仍超时即杀；
+    ///    已退出无产物/崩溃报告在时窗→异常计数+1，达"最大异常次数"→杀进程判异常失败；纯无响应只提示、异常清零、不杀。
+    ///  · 任务收尾：复核表中"已落定"帧在磁盘上是否仍有有效产物，缺失只记告警（下次启动重新扫描并补渲）。
     ///
-    /// 时间参数：轮询=检查间隔；"杀进程→下次启动"之间按结束原因插入空载冷却（自杀成功1s / 自然退出或有进展→30s检查间隔 / 秒退·崩溃·无进展异常或跳帧→60s帧间冷却 / 清残留→3s），此间无进程真正降温；产物落定需距最后写入≥帧间冷却秒；无进展超时/崩溃时窗独立；挂起由"无进展超时"收口。
+    /// 时间参数：轮询=检查间隔；"块结束→下次启动"之间按结束原因插入空载冷却：
+    ///   自杀成功1s / 自然退出→帧间冷却+检查间隔(默认60+30=90s，散热，不得缩短) / 有进展→30s /
+    ///   秒退·崩溃·无进展异常或跳帧→60s / 清残留→3s。此间无渲染进程，是真降温。
+    ///   帧间冷却另用于启动扫描的历史产物判定与 SuccessKilled 写入静默期；无进展超时/崩溃时窗独立。
     /// 全部帧号/块端点均夹到 [StartFrame,EndFrame]。
     /// </summary>
     public class FrameRenderController : IRenderController
@@ -66,6 +77,8 @@ namespace RenderServerGui.Services
         private ModeProfile _p;
         /// <summary>当前正在执行的任务（逐帧参数从这里读）。</summary>
         private RenderTask _currentTask;
+        /// <summary>当前任务的帧状态表（任务启动时建，运行期只查内存，块结束后增量更新）。</summary>
+        private FrameStateMap _frameMap;
 
         /// <summary>控制器是否正在运行。</summary>
         public bool IsRunning { get; private set; }
@@ -194,6 +207,14 @@ namespace RenderServerGui.Services
                 return true; // 不算熔断，直接跳过
             }
 
+            // 任务启动、渲染进程尚未拉起、机器空载：一次目录枚举建立帧状态表。
+            // 落定判定沿用 CooldownSeconds，避免把孤儿 C4D 进程仍在写的半成品算作成品。
+            _frameMap = new FrameStateMap(start, end);
+            _frameMap.Load(FrameScanner.ScanSettledStates(_currentTask.OutputTemplate, start, end, _p.CooldownSeconds));
+            int settledAtStart = _frameMap.CountSettled(start, end);
+            LogInfo(Localizer.Tf("log.fr.stateScan", "帧状态扫描：{0}/{1} 帧已落定，{2} 帧待渲。",
+                settledAtStart, total, total - settledAtStart));
+
             int N = Math.Max(1, _currentTask.MaxChunkLength);
             int cursor = start;
             int consecStall = 0;
@@ -202,12 +223,17 @@ namespace RenderServerGui.Services
 
             while (cursor <= end && !_stopRequested)
             {
-                // 跳过已落定的帧（续渲/重叠）
-                while (cursor <= end && IsSettled(cursor)) cursor++;
+                // 跳过已落定的帧（续渲/重叠）——查表，不再逐帧 stat
+                while (cursor <= end && _frameMap.IsSettled(cursor)) cursor++;
                 if (cursor > end) break;
 
                 int fa = cursor;
-                int fb = Math.Min(fa + N - 1, end);
+                // 块尾必须停在下一个已落定帧之前：C4D 的 -frame a b 1 是连续区间，
+                // 无法跳过区间内已完成帧，越过就会覆盖重渲（浪费算力，且可能损坏已有成品）。
+                // hi 先按 N 收敛上限，避免全缺时一路扫到末帧。
+                int hi = Math.Min(end, fa + N - 1);
+                int fb = fa;
+                while (fb < hi && !_frameMap.IsSettled(fb + 1)) fb++;
                 int focusFail = 0;
 
                 while (true)
@@ -218,6 +244,7 @@ namespace RenderServerGui.Services
                     if (preIdle > 0 && !SleepIdle(preIdle)) break;
 
                     BlockOutcome oc = RunBlock(fa, fb);
+                    ApplyBlockResult(fa, fb, oc);   // 按实际产物更新帧状态表
                     if (oc == BlockOutcome.Abort) { _stopRequested = true; break; }
 
                     if (oc == BlockOutcome.SuccessKilled)
@@ -226,11 +253,16 @@ namespace RenderServerGui.Services
                     }
                     if (oc == BlockOutcome.SuccessExited)
                     {
-                        consecStall = 0; preIdle = _p.FrameCheckIntervalSeconds; cursor = fb + 1; break;
+                        // 块间散热：帧间冷却 + 一个检查间隔（默认 60+30=90s，无渲染进程、空载）。
+                        // 原实现的散热由"落定需距写入≥帧间冷却"在块尾自然形成；改造去掉该判据后
+                        // 必须显式保留同等时长，不得缩短。CooldownSeconds 的注释本就是「避免过热」。
+                        consecStall = 0;
+                        preIdle = _p.CooldownSeconds + _p.FrameCheckIntervalSeconds;
+                        cursor = fb + 1; break;
                     }
 
-                    // 失败：按实际产物决定游标
-                    int newFirst = FirstUnsettled(fa, fb);
+                    // 失败：按帧状态表决定游标
+                    int newFirst = _frameMap.FirstUnsettled(fa, fb);
                     if (newFirst < 0) { consecStall = 0; preIdle = _p.FrameCheckIntervalSeconds; cursor = fb + 1; break; }
 
                     if (newFirst > fa) // 有进展：游标推到缺口，重取块
@@ -272,6 +304,8 @@ namespace RenderServerGui.Services
                 }
             }
 
+            VerifyFinishedFrames(start, end);
+
             LogInfo(Localizer.Tf("log.fr.taskDone", "{0} 完成：已推进 {1}/{2} 帧。",
                 _currentTask.DisplayLabel, Clamp(cursor - start, 0, total), total));
             return true;
@@ -306,7 +340,7 @@ namespace RenderServerGui.Services
                 var crashWindow = TimeSpan.FromSeconds(_p.FrameCheckIntervalSeconds * (_p.MaxAbnormalCount + 1.5));
 
                 int abnormal = 0;
-                int lastSettled = 0;
+                int lastWritten = 0;
                 var lastProgress = startT;
                 var lastWriteUtc = DateTime.MinValue;   // 块内产物最近见到的写入时刻；mtime 前进 = 渲染在正常产出
                 DateTime? noProgressSince = null;       // 无进展超时首现时刻（下一轮复查仍超时才杀）
@@ -317,27 +351,33 @@ namespace RenderServerGui.Services
                 {
                     if (_stopRequested) { KillTree(process); return BlockOutcome.Abort; }
 
-                    int settled = CountSettled(a, b);
-                    bool allSettled = settled >= blockLen;
-                    if (allSettled)
+                    // 一次块内目录枚举，同时得到"存在且非空"的帧数与块内最新写入时刻，
+                    // 替代原来的逐帧 CountSettled + 全目录 GetLatestWriteTimeUtc 两次扫描。
+                    var scan = FrameScanner.ScanBlock(_currentTask.OutputTemplate, a, b);
+                    int written = scan.NonEmptyCount;
+                    bool allWritten = written >= blockLen;
+                    bool exited = SafeExited(process);
+                    // 静默期：块内产物最近一次写入距今 ≥ 帧间冷却，用于确认进程被杀时写入确已停止。
+                    bool quiet = scan.LatestWriteUtc > DateTime.MinValue &&
+                                 (DateTime.UtcNow - scan.LatestWriteUtc).TotalSeconds >= _p.CooldownSeconds;
+
+                    if (allWritten && exited)
                     {
-                        bool alive = !SafeExited(process);
-                        if (alive)
-                        {
-                            LogInfo(Localizer.Tf("log.fr.doneKilled", "块[{0},{1}] 全部落定但进程未退出，结束进程并计成功。", a, b));
-                            KillTree(process);
-                            return BlockOutcome.SuccessKilled;
-                        }
                         LogInfo(Localizer.Tf("log.fr.doneExit", "块[{0},{1}] 渲染完成（退出码 {2}）。", a, b, SafeExitCode(process)));
                         return BlockOutcome.SuccessExited;
                     }
+                    if (allWritten && !exited && quiet)
+                    {
+                        LogInfo(Localizer.Tf("log.fr.doneKilled", "块[{0},{1}] 全部产出且写入已停止，但进程未退出，结束进程并计成功。", a, b));
+                        KillTree(process);
+                        return BlockOutcome.SuccessKilled;
+                    }
+                    // allWritten 但进程仍在写（!quiet）：继续轮询，不杀、也不算完成
 
-                    // 进展判定：落定数增加，或产物文件 mtime 前进（正在写盘也算正常产出），二者任一即重置无进展计时
-                    if (settled > lastSettled) { lastSettled = settled; lastProgress = DateTime.Now; }
-                    var writeUtc = FrameScanner.GetLatestWriteTimeUtc(_currentTask.OutputTemplate);
-                    if (writeUtc > lastWriteUtc) { lastWriteUtc = writeUtc; lastProgress = DateTime.Now; }
+                    // 进展判定：非空产物数增加，或块内产物 mtime 前进（正在写盘也算正常产出），二者任一即重置无进展计时
+                    if (written > lastWritten) { lastWritten = written; lastProgress = DateTime.Now; }
+                    if (scan.LatestWriteUtc > lastWriteUtc) { lastWriteUtc = scan.LatestWriteUtc; lastProgress = DateTime.Now; }
 
-                    bool exited = SafeExited(process);
                     bool noProgress = (DateTime.Now - lastProgress).TotalSeconds > _currentTask.FrameTimeoutSeconds;
                     bool crash = ProcessHealth.IsBugReportRecent(_p.ReportPath, crashWindow);
 
@@ -348,10 +388,10 @@ namespace RenderServerGui.Services
                         unresponsive = process.MainWindowHandle != IntPtr.Zero && !ProcessHealth.IsResponding(process);
                     }
 
-                    // 已退出且已有部分落定：终态且能续，立即判尝试失败（让外层前进到缺口）
-                    if (exited && settled > 0 && !allSettled)
+                    // 已退出且已有部分产物：终态且能续，立即判尝试失败（让外层前进到缺口）
+                    if (exited && written > 0 && !allWritten)
                     {
-                        LogWarn(Localizer.Tf("log.fr.exitedPartial", "块[{0},{1}] 进程退出、已完成 {2}/{3} 帧，判本次尝试失败，外层从缺口续渲。", a, b, settled, blockLen));
+                        LogWarn(Localizer.Tf("log.fr.exitedPartial", "块[{0},{1}] 进程退出、已完成 {2}/{3} 帧，判本次尝试失败，外层从缺口续渲。", a, b, written, blockLen));
                         return BlockOutcome.FailedProgress;
                     }
 
@@ -374,7 +414,7 @@ namespace RenderServerGui.Services
 
                     // 秒退/崩溃报告属瞬时信号，保留异常计数去抖
                     string badReason = null;
-                    if (exited && settled == 0) badReason = Localizer.T("log.fr.reasonSnappy", "已退出无产物(秒退)");
+                    if (exited && written == 0) badReason = Localizer.T("log.fr.reasonSnappy", "已退出无产物(秒退)");
                     else if (crash) badReason = Localizer.T("log.fr.reasonCrash", "崩溃报告在时窗内");
 
                     if (badReason != null)
@@ -417,25 +457,57 @@ namespace RenderServerGui.Services
             }
         }
 
-        // ---------- 帧扫描辅助（全部夹在 [Start,End] 内） ----------
+        // ---------- 帧状态表（任务级唯一真值） ----------
 
-        /// <summary>某帧产物是否已落定（存在·非空·距写入≥帧间冷却秒）。</summary>
-        private bool IsSettled(int frame)
-            => FrameScanner.IsFrameSettled(_currentTask.OutputTemplate, frame, _p.CooldownSeconds);
-
-        /// <summary>统计区间 [a,b] 内已落定的帧数。</summary>
-        private int CountSettled(int a, int b)
+        /// <summary>
+        /// 块结束后把实际产物写回帧状态表。
+        /// 成功（进程已退出，或静默期确认写入已停止）→ 整块置已落定；
+        /// 失败 → 一次块内枚举，首个"不存在或为空"之前的帧置已落定，其余保持未落定待重渲。
+        /// 结算口径用"存在且非空"而非冷却：进程已退出即写入完成，冷却只用于启动扫描与 SuccessKilled 静默期。
+        /// </summary>
+        private void ApplyBlockResult(int a, int b, BlockOutcome oc)
         {
-            int n = 0;
-            for (int f = a; f <= b; f++) if (IsSettled(f)) n++;
-            return n;
+            if (oc == BlockOutcome.Abort || _frameMap == null) return;
+
+            if (oc == BlockOutcome.SuccessExited || oc == BlockOutcome.SuccessKilled)
+            {
+                _frameMap.Mark(a, b, FrameStateMap.Settled);
+                return;
+            }
+
+            var scan = FrameScanner.ScanBlock(_currentTask.OutputTemplate, a, b);
+            int first = scan.FirstMissing();
+            if (first < 0) _frameMap.Mark(a, b, FrameStateMap.Settled);
+            else
+            {
+                _frameMap.Mark(a, first - 1, FrameStateMap.Settled);
+                _frameMap.Mark(first, b, FrameStateMap.Missing);
+            }
         }
 
-        /// <summary>返回区间 [a,b] 内第一个未落定的帧号；全部落定返回 -1。</summary>
-        private int FirstUnsettled(int a, int b)
+        /// <summary>
+        /// 任务收尾：复核表中已落定帧在磁盘上是否仍有有效产物。
+        /// 渲染中被外部删除或改成 0 字节时状态表不感知，这里把静默缺帧变成可见告警；
+        /// 不自愈（回退 cursor 需改循环结构），下次启动会重新扫描并补渲。
+        /// 复核用 minAge=0，只核存在与大小，与时间无关。
+        /// </summary>
+        private void VerifyFinishedFrames(int start, int end)
         {
-            for (int f = a; f <= b; f++) if (!IsSettled(f)) return f;
-            return -1;
+            if (_frameMap == null) return;
+            byte[] actual = FrameScanner.ScanSettledStates(_currentTask.OutputTemplate, start, end, 0);
+            var missing = new List<int>();
+            for (int f = start; f <= end && f < actual.Length; f++)
+                if (_frameMap.IsSettled(f) && actual[f] != FrameStateMap.Settled) missing.Add(f);
+            if (missing.Count == 0) return;
+
+            int shown = Math.Min(50, missing.Count);
+            var parts = new string[shown];
+            for (int i = 0; i < shown; i++) parts[i] = missing[i].ToString();
+            string list = string.Join(", ", parts);
+            if (missing.Count > shown) list += " …";
+            LogWarn(Localizer.Tf("log.fr.missingOnFinish",
+                "任务完成但检测到 {0} 帧产物缺失/为空（表中已落定、磁盘无有效文件）：{1}；下次启动会重新识别并补渲。",
+                missing.Count, list));
         }
 
         /// <summary>把 v 夹到 [lo,hi]。</summary>

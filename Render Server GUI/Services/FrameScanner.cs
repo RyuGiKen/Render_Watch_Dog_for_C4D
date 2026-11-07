@@ -115,21 +115,44 @@ namespace RenderServerGui.Services
 
         /// <summary>
         /// 按命名模板解析目录里"符合同一命名规则"的文件帧号，返回去重升序列表。
-        /// 占位星号段转成捕获组 (\\d+)，对每个文件"整名"匹配；带前后缀的多通道文件整名不匹配→忽略。
-        /// 模板无占位符或目录不存在时返回空。
+        /// 与 ScanSettledStates / ScanBlock 共用 BuildFrameNameRegex，保证三处命名口径完全一致。
+        /// 带前后缀的多通道文件整名不匹配→忽略；模板无占位符或目录不存在时返回空。
         /// </summary>
         public static List<int> EnumerateRenderedFrames(string template)
         {
             var result = new List<int>();
-            if (string.IsNullOrEmpty(template) || !TokenRegex.IsMatch(template))
-                return result;
+            Regex re = BuildFrameNameRegex(template);
+            if (re == null) return result;
 
             string dir = Path.GetDirectoryName(template);
-            string filePattern = Path.GetFileName(template);
-            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
-                return result;
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return result;
 
-            // 把占位段转成 (\d+)，其余字符正则转义，拼成"整文件名"匹配的正则
+            var set = new HashSet<int>();
+            try
+            {
+                foreach (string f in Directory.EnumerateFiles(dir))
+                {
+                    int frame;
+                    if (TryParseFrame(re, Path.GetFileName(f), out frame)) set.Add(frame);
+                }
+            }
+            catch { return result; }
+
+            result.AddRange(set);
+            result.Sort();
+            return result;
+        }
+
+        /// <summary>
+        /// 把模板的"文件名部分"转成整名匹配正则：占位星号段 -> 捕获组 (\d+)，其余字符转义。
+        /// 用 (\d+) 而非等长通配，是为了容忍实际帧号位数与模板星号数不符（ToGlob 做不到这一点）。
+        /// 模板无占位符 / 正则构造失败返回 null。
+        /// </summary>
+        private static Regex BuildFrameNameRegex(string template)
+        {
+            if (string.IsNullOrEmpty(template) || !TokenRegex.IsMatch(template)) return null;
+
+            string filePattern = Path.GetFileName(template);
             var sb = new System.Text.StringBuilder("^");
             int i = 0;
             while (i < filePattern.Length)
@@ -149,27 +172,133 @@ namespace RenderServerGui.Services
             }
             sb.Append('$');
 
-            Regex re;
-            try { re = new Regex(sb.ToString(), RegexOptions.Compiled | RegexOptions.IgnoreCase); }
-            catch { return result; }
+            try { return new Regex(sb.ToString(), RegexOptions.Compiled | RegexOptions.IgnoreCase); }
+            catch { return null; }
+        }
 
-            var set = new HashSet<int>();
+        /// <summary>整名匹配并解析帧号；不匹配或解析失败返回 false。</summary>
+        private static bool TryParseFrame(Regex re, string fileName, out int frame)
+        {
+            frame = 0;
+            var mm = re.Match(fileName);
+            if (!mm.Success) return false;
+            return int.TryParse(mm.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out frame);
+        }
+
+        /// <summary>
+        /// 一次目录枚举生成任务级帧状态表：索引 = 绝对帧号，长度 end+1。
+        /// 0=范围外，1=未落定，2=已落定。判定口径与 IsFrameSettled 一致：存在·非空·距最后写入≥minAgeSeconds。
+        /// minAgeSeconds&lt;=0 时只要求存在且非空（用于收尾复核，与时间无关）。
+        /// 用 DirectoryInfo.EnumerateFiles 而非逐帧 FileInfo：Length / LastWriteTimeUtc 随枚举由
+        /// WIN32_FIND_DATA 带回，不额外触发逐文件 stat。
+        /// </summary>
+        public static byte[] ScanSettledStates(string template, int start, int end, int minAgeSeconds)
+        {
+            if (end < 0) return new byte[0];
+            var states = new byte[end + 1];
+            for (int f = Math.Max(0, start); f <= end; f++) states[f] = FrameStateMap.Missing;
+
+            Regex re = BuildFrameNameRegex(template);
+            if (re == null) return states;
+
+            string dir = Path.GetDirectoryName(template);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return states;
+
             try
             {
-                foreach (string f in Directory.EnumerateFiles(dir))
+                foreach (FileInfo fi in new DirectoryInfo(dir).EnumerateFiles())
                 {
-                    var mm = re.Match(Path.GetFileName(f));
-                    if (!mm.Success) continue;
                     int frame;
-                    if (int.TryParse(mm.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out frame))
-                        set.Add(frame);
+                    if (!TryParseFrame(re, fi.Name, out frame)) continue;
+                    if (frame < start || frame > end) continue;
+                    if (fi.Length <= 0) continue;                 // 0 字节：崩溃残留，视为缺帧
+                    if (minAgeSeconds > 0 &&
+                        (DateTime.UtcNow - fi.LastWriteTimeUtc).TotalSeconds < minAgeSeconds) continue;
+                    states[frame] = FrameStateMap.Settled;
                 }
             }
-            catch { return result; }
+            catch { /* 目录不可读时保留已扫描结果，与 IsFrameSettled 的 catch→false 语义一致 */ }
 
-            result.AddRange(set);
-            result.Sort();
-            return result;
+            return states;
+        }
+
+        /// <summary>
+        /// 一次目录枚举得到块内状态：存在且非空的帧数、块内最新写入时刻、首个缺失帧号。
+        /// 只看 [from,to] 内的帧，避免别的任务/通道在写同一目录时干扰本块的无进展判定
+        /// （旧实现 GetLatestWriteTimeUtc 扫的是整个目录）。
+        /// </summary>
+        public static BlockScan ScanBlock(string template, int from, int to)
+        {
+            var scan = new BlockScan(from, to);
+            Regex re = BuildFrameNameRegex(template);
+            if (re == null) return scan;
+
+            string dir = Path.GetDirectoryName(template);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return scan;
+
+            try
+            {
+                foreach (FileInfo fi in new DirectoryInfo(dir).EnumerateFiles())
+                {
+                    int frame;
+                    if (!TryParseFrame(re, fi.Name, out frame)) continue;
+                    if (frame < from || frame > to) continue;
+                    if (fi.LastWriteTimeUtc > scan.LatestWriteUtc) scan.SetLatestWriteUtc(fi.LastWriteTimeUtc);
+                    if (fi.Length > 0) scan.MarkPresent(frame);
+                }
+            }
+            catch { /* 保留已扫描结果 */ }
+
+            return scan;
+        }
+    }
+
+    /// <summary>块内一次目录枚举的结果（帧号按 from..to 相对存放）。</summary>
+    public sealed class BlockScan
+    {
+        private readonly bool[] _present;
+        private readonly int _from;
+        private int _nonEmptyCount;
+
+        /// <summary>块内帧范围。</summary>
+        public int From { get; private set; }
+        /// <summary>块内帧范围。</summary>
+        public int To { get; private set; }
+        /// <summary>块内"存在且非空"的帧数。</summary>
+        public int NonEmptyCount { get { return _nonEmptyCount; } }
+        /// <summary>块内产物最近一次写入时刻（UTC）；无产物为 DateTime.MinValue。</summary>
+        public DateTime LatestWriteUtc { get; private set; }
+
+        public BlockScan(int from, int to)
+        {
+            _from = from;
+            From = from;
+            To = to;
+            _present = new bool[Math.Max(0, to - from + 1)];
+            LatestWriteUtc = DateTime.MinValue;
+        }
+
+        internal void SetLatestWriteUtc(DateTime utc) { LatestWriteUtc = utc; }
+
+        internal void MarkPresent(int frame)
+        {
+            int idx = frame - _from;
+            if (idx < 0 || idx >= _present.Length || _present[idx]) return;
+            _present[idx] = true;
+            _nonEmptyCount++;
+        }
+
+        public bool IsPresent(int frame)
+        {
+            int idx = frame - _from;
+            return idx >= 0 && idx < _present.Length && _present[idx];
+        }
+
+        /// <summary>块内第一个"不存在或为空"的帧号；全部存在且非空返回 -1。</summary>
+        public int FirstMissing()
+        {
+            for (int i = 0; i < _present.Length; i++) if (!_present[i]) return _from + i;
+            return -1;
         }
     }
 }

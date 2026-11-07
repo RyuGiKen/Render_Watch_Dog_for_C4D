@@ -85,11 +85,13 @@ dlg.preexistBody=Detected {0} running "{1}" process(es).\n\n"Yes" = kill them an
 log.fr.startCmd=Chunk render start: {0}  {1} task(s)
 log.fr.taskBrief=  {2} ({0}/{1})  chunk<={3}  timeout {4}s
 log.fr.taskStart=═══ {0} ({1}/{2}) ═══
+log.fr.stateScan=Frame state scan: {0}/{1} settled, {2} to render.
 log.fr.taskCooldown=Inter-task cooldown {0}s...
 log.fr.taskSkipped={0} skipped (circuit breaker).
 log.fr.sceneMissing=Project file not found; skipping {0}: {1}
 log.fr.autoDetectExe=Auto-detected executable: {0}
 log.fr.autoDetectReport=Auto-detected crash report: {0}
+log.fr.missingOnFinish=Task finished but {0} frame(s) marked settled are missing or empty on disk: {1}; they will be re-detected and rendered on next start.
 log.fr.taskDone={0} done: advanced {1}/{2} frame(s).
 log.fr.allDone=All {0} task(s) finished.
 log.fr.taskProgress=Task {0}/{1}
@@ -101,7 +103,7 @@ log.fr.stopping=Stopping... (will end the current render process)
 log.fr.noFrames=End frame is less than start frame; nothing to render.
 log.fr.userStop=User chose to stop; nothing started.
 log.fr.blockStart=Start rendering chunk[{0},{1}] PID {2}  args: {3}
-log.fr.doneKilled=Chunk[{0},{1}] all frames settled but process still alive; ending it and counting as success.
+log.fr.doneKilled=Chunk[{0},{1}] all frames written and output idle, but process still alive; ending it and counting as success.
 log.fr.doneExit=Chunk[{0},{1}] render complete (exit code {2}).
 log.fr.exitedPartial=Chunk[{0},{1}] process exited, {2}/{3} frames done; marking this attempt failed, resuming from the gap.
 log.fr.abnCount=Chunk[{0},{1}] {2}, abnormal count {3}/{4}.

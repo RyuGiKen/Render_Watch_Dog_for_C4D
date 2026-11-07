@@ -24,18 +24,24 @@ A Cinema 4D watchdog + multi-task per-frame/chunk render scheduler (Windows desk
 - **单帧/分块 N** / Per-frame == chunk with N=1  
   最大分块长度 N≥1（自动夹到任务范围），N=5 时一个进程连渲 5 帧。  
   Max chunk length N≥1 (clamped to the task range); N=5 renders 5 frames per process.
+- **帧状态表与块尾限位** / Frame state table & chunk-tail clamp  
+  任务启动、渲染进程未拉起时一次目录枚举建表，运行期游标推进与块尾判定只查内存；块尾停在下一个已落定帧之前，避免 `-frame a b 1` 连续区间覆盖重渲已有成品。  
+  At each task start (no render process running) one directory enumeration builds a frame state table; cursor and chunk-tail checks are in-memory only. The chunk tail stops before the next settled frame so the continuous `-frame a b 1` range never overwrites finished output.
 - **进度判定** / Progress detection  
-  产物须"存在·非空·距写入≥帧间冷却"才算落定，据此续渲与跳过已完成帧。  
-  Output counts as settled only if it exists, is non-empty and hasn't been written for the cooldown; used for resume and skip.
+  历史产物须"存在·非空·距写入≥帧间冷却"才算落定；块结算以"进程已退出 + 产物存在且非空"为准（句柄已关即写入完成），据此续渲与跳过已完成帧。  
+  Historical output is settled only if it exists, is non-empty and hasn't been written for the cooldown; block results use "process exited + output exists and is non-empty" instead.
+- **收尾复核** / Finish verification  
+  任务结束时复核表中已落定帧在磁盘上是否仍有有效产物；被外部删除或改坏时记告警并列出帧号（不自愈，下次启动重新扫描补渲）。  
+  On task finish, settled frames are re-checked on disk; externally deleted or damaged ones are reported (no in-run repair; next start re-scans).
 - **异常去抖** / Debounced abnormal counting  
   崩溃报告按时间窗计数：命中+1、达上限才杀、出窗清零。  
   Crash reports are counted within a time window: +1 on hit, kill only at the limit, clear when out of window.
 - **挂起=无进展超时** / Hang = no-progress timeout  
   GUI 高负载"无响应"不杀进程；只要产物仍有写入活动（新帧落定或文件更新中）就持续重置计时，块内逐帧产出不空等；超过无进展超时且完全无产物写入才杀进程重试（首现记录、下一轮复查确认）。  
   Under heavy load "not responding" is normal; any output write activity (a settled frame or a file being written) keeps resetting the timer, so multi-frame chunks never idle-wait. The process is killed only after the no-progress timeout with zero output writes (first seen, then re-checked next round).
-- **热崩冷却** / Cooldown after kill  
-  每次杀进程后按结果插入 1/30/60s 的空载冷却，兼顾满载散热。  
-  After each kill an idle cooldown (1/30/60 s by outcome) lets the machine cool down.
+- **块间散热** / Inter-chunk cooldown  
+  无渲染进程的空载等待按结果插入 1 / 30 / 60s；自然退出后为「帧间冷却 + 检查间隔」= 60+30=90s，兼顾满载散热。块内 N 帧连渲不插入冷却。  
+  Idle waits with no render process: 1 / 30 / 60 s by outcome; after a normal exit it is cooldown + check interval = 60+30 = 90 s. No idle wait inside a chunk.
 - **熔断跳任务** / Circuit breaker skips the task  
   连续多块在起点即失败且无进展 → 判全局问题（资产缺失/未烘缓存/授权），跳过当前任务继续下一个，不再终止整场。  
   Consecutive no-progress chunk starts indicate a global issue (missing asset / unbaked cache / license); the current task is skipped and the queue continues.
@@ -74,8 +80,8 @@ Log in to C4D once and confirm a manual command-line render works.
 Pick a mode and fill paths; in frame modes, add tasks with "+" and set each task's project file, output template, frame range, chunk size and timeout; "+" duplicates the selected task.
 3. 点"预览输出文件名并校验目录"核对命名规则与工程实际输出一致。  
 Use "Preview" to confirm the naming rule matches the project's real output.
-4. 设全局时间参数后"启动"，队列按顺序执行；重开后确认缺帧再填范围续渲。  
-Set global timing and Start; the queue runs in order. After a restart, fill the missing range to resume.
+4. 设全局时间参数后"启动"，队列按顺序执行；每个任务启动时自动扫描全范围识别缺帧，块尾会避开已有成品，无需手工拆分范围。  
+Set global timing and Start; the queue runs in order. Each task scans its full range at startup to detect gaps and chunk tails avoid finished frames — no manual range splitting needed.
 
 ## 注意 / Caveats
 
@@ -96,16 +102,22 @@ Each task's project file is checked before launch; a missing one (renamed/lost/d
 Render Server GUI/
 ├─ Program.cs                  入口 + 单例 + 全局异常兜底 / entry + single-instance + exception handler
 ├─ app.manifest                PerMonitorV2 DPI 感知声明 / high-DPI awareness manifest
+├─ App.config                  运行时框架版本 / target framework runtime config
+├─ Render Server GUI.csproj    工程文件 / legacy csproj
 ├─ Models/                     参数与配置 / parameters & config
 │  ├─ RenderMode.cs            模式枚举 / mode enum
 │  ├─ RenderTask.cs            单条渲染任务（工程/模板/范围/分块/超时）/ one render task
 │  ├─ ModeProfile.cs           模式参数集（含任务队列）/ per-mode params incl. task queue
 │  └─ AppConfig.cs             settings.xml 持久化 / settings persistence
+├─ Properties/
+│  └─ AssemblyInfo.cs          程序集信息 / assembly metadata
 ├─ Services/
 │  ├─ IRenderController.cs     控制器契约 / controller contract
 │  ├─ TeamRenderController.cs  ① 看门狗 / watchdog
 │  ├─ FrameRenderController.cs ②③ 任务队列 + 单帧/分块引擎 / task queue + per-frame & chunk engine
-│  ├─ FrameScanner.cs          命名展开与落定判定 / naming & settle checks
+│  ├─ FrameScanner.cs          命名展开、落定判定、目录快照 / naming, settle checks, directory scans
+│  ├─ FrameStateMap.cs         任务级帧状态表 / per-task frame state table
+│  ├─ C4dPathLocator.cs        主程序与异常记录路径自动定位 / exe & bug-report path auto-detection
 │  ├─ ProcessHealth.cs         健康信号 / health signals
 │  ├─ KeepAwake.cs             渲染时阻止系统睡眠 / prevent sleep during render
 │  └─ Localizer.cs             多语言 / i18n
