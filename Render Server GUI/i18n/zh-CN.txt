@@ -1,3 +1,21 @@
 #name=简体中文
 # 简体中文为默认/回退语言：代码里各调用处的备用词即简体中文原文。
 # 此处可留空（缺键自动回退到备用词）；如需覆盖个别措辞，在此按 key=value 补写即可。
+
+# --- 工程文件加载时自动读取渲染设置 ---
+log.sceneAutoMissing=工程文件不存在，跳过渲染设置读取：{0}
+log.sceneAutoFail=读取工程渲染设置失败：{0}
+log.sceneAuto=已读取工程渲染设置（第 {0} 组）：输出 {1}，帧 {2}
+log.sceneAutoNoOutput=(工程内未设置输出路径)
+log.sceneAutoDynamic=由 C4D 动态解析，保留手填范围
+log.sceneNoteSaveOff=工程内未勾选保存图像，输出路径可能不会被写入
+log.sceneNoteManualStep=手动步进={0}，帧号不连续，仅采用首帧 {1}
+log.sceneNoteTruncated=自定义帧串 {0} 不连续，仅采用第一段 {1}-{2}
+log.sceneNoteDynamic=帧范围模式「{0}」由 C4D 动态解析，文件内不含具体帧号，保留手填范围
+log.sceneAutoOtherRanges=工程内另有可离线读取的帧范围：{0}（如需使用，请在 C4D 中设为活动渲染设置后重新加载）
+log.sceneNoteTimeline=帧范围模式「{0}」按文档时间轴解析：{1}-{2} 帧
+log.sceneNoteCurrentFrame=帧范围模式「CURRENTFRAME」按文档当前帧解析：第 {0} 帧
+log.sceneLoading=正在读取工程渲染设置，请稍候…
+log.tagAbnormal=异常! 
+log.tagNoResp=无响应! 
+log.taskkillFail=taskkill 执行失败({0}): {1}

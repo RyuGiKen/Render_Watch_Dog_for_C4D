@@ -76,8 +76,8 @@ A Cinema 4D watchdog + multi-task per-frame/chunk render scheduler (Windows desk
 
 1. 在渲染机完成 C4D 授权登录，并手动命令行渲一帧确认出图。  
 Log in to C4D once and confirm a manual command-line render works.
-2. 选模式，填主程序/进程名/异常记录路径；单帧模式点"+"添加任务，逐个填工程文件、输出模板、帧范围、分块与无进展超时，可继续"+"复制更多任务。  
-Pick a mode and fill paths; in frame modes, add tasks with "+" and set each task's project file, output template, frame range, chunk size and timeout; "+" duplicates the selected task.
+2. 选模式，填主程序/进程名/异常记录路径；单帧模式点"+"添加任务。工程文件点「…」选中 `.c4d` 后会自动填入输出模板与帧范围（后台读取，大文件有进度提示），再按需微调分块与无进展超时；可继续"+"复制更多任务。  
+Pick a mode and fill paths; in frame modes, add tasks with "+". Clicking "…" on the project file auto-fills the output template and frame range from the `.c4d` (background read with a progress dialog for large files) — then tweak chunk size and timeout as needed; "+" duplicates the selected task.
 3. 点"预览输出文件名并校验目录"核对命名规则与工程实际输出一致。  
 Use "Preview" to confirm the naming rule matches the project's real output.
 4. 设全局时间参数后"启动"，队列按顺序执行；每个任务启动时自动扫描全范围识别缺帧，块尾会避开已有成品，无需手工拆分范围。  
@@ -93,8 +93,8 @@ Unbaked simulations render wrong pixels from mid-range, bake first.
 Chunking saves cold starts but renders back-to-back; keep N modest.
 - 任务队列上限 99 个；主键达 int 上限同样拒绝添加（防护，正常到不了）。  
 The queue holds at most 99 tasks; IDs are also capped at the int limit (safety guard only).
-- 每个任务启动进程前检测工程文件是否存在，缺失（路径改动/丢失/误删）则跳过该任务并记日志——否则 C4D 会打开空工程卡在非渲染状态。输出模板无法从工程内读取，需靠"预览"人工核对，写错则由无进展超时兜底。  
-Each task's project file is checked before launch; a missing one (renamed/lost/deleted) skips the task with a log line — otherwise C4D opens an empty scene and stalls. The output template can't be read from inside the project, so verify it via "Preview"; a wrong one falls back to the no-progress timeout.
+- 每个任务启动进程前检测工程文件是否存在，缺失（路径改动/丢失/误删）则跳过该任务并记日志——否则 C4D 会打开空工程卡在非渲染状态。  
+Each task's project file is checked before launch; a missing one (renamed/lost/deleted) skips the task with a log line — otherwise C4D opens an empty scene and stalls.
 
 ## 目录 / Layout
 
@@ -118,10 +118,12 @@ Render Server GUI/
 │  ├─ FrameScanner.cs          命名展开、落定判定、目录快照 / naming, settle checks, directory scans
 │  ├─ FrameStateMap.cs         任务级帧状态表 / per-task frame state table
 │  ├─ C4dPathLocator.cs        主程序与异常记录路径自动定位 / exe & bug-report path auto-detection
+│  ├─ C4dRenderSettingsReader.cs 读取 .c4d 二进制渲染设置（输出/帧范围）/ read render settings from .c4d binary
 │  ├─ ProcessHealth.cs         健康信号 / health signals
 │  ├─ KeepAwake.cs             渲染时阻止系统睡眠 / prevent sleep during render
 │  └─ Localizer.cs             多语言 / i18n
 ├─ UI/MainForm.cs(+Designer)   界面（自适应布局）/ UI (adaptive layout)
+├─ UI/LoadingDialog.cs         读取工程时的异步进度提示 / async progress dialog for project loading
 ├─ i18n/                       zh-CN / zh-HK / en-US
 └─ 逐帧渲染调度流程图.html       流程图 / flowchart
 ```

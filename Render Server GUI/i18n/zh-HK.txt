@@ -152,3 +152,18 @@ log.tr.cacheDirFail=刪除目錄失敗: {0} - {1}
 log.tr.cacheCleared=清空緩存完成
 log.tr.cacheErr=清空緩存異常: {0}
 log.taskkillFail=taskkill 執行失敗({0}): {1}
+
+# --- 載入工程檔時自動讀取渲染設定 ---
+log.sceneAutoMissing=工程檔案不存在，略過讀取渲染設定：{0}
+log.sceneAutoFail=讀取工程渲染設定失敗：{0}
+log.sceneAuto=已讀取工程渲染設定（第 {0} 組）：輸出 {1}，幀 {2}
+log.sceneAutoNoOutput=(工程內未設定輸出路徑)
+log.sceneAutoDynamic=由 C4D 動態解析，保留手填範圍
+log.sceneNoteSaveOff=工程內未勾選儲存影像，輸出路徑可能不會被寫入
+log.sceneNoteManualStep=手動步進={0}，幀號不連續，僅採用首幀 {1}
+log.sceneNoteTruncated=自訂幀串 {0} 不連續，僅採用第一段 {1}-{2}
+log.sceneNoteDynamic=幀範圍模式「{0}」由 C4D 動態解析，檔案內不含具體幀號，保留手填範圍
+log.sceneAutoOtherRanges=工程內另有可離線讀取的幀範圍：{0}（如需使用，請在 C4D 中設為活動渲染設定後重新載入）
+log.sceneNoteTimeline=幀範圍模式「{0}」按文件時間軸解析：{1}-{2} 幀
+log.sceneNoteCurrentFrame=幀範圍模式「CURRENTFRAME」按文件目前幀解析：第 {0} 幀
+log.sceneLoading=正在讀取工程渲染設定，請稍候…

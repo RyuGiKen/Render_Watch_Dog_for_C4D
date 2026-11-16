@@ -914,7 +914,135 @@ namespace RenderServerGui.UI
                 dlg.CheckFileExists = false;
                 TryFill(target, dlg, initialDirOf(target.Text));
             }
+            // 选中工程后，直接从 .c4d 二进制读取输出路径与帧范围（不启动 C4D、不依赖 Python）
+            TryAutoFillFromScene();
             // 列表显示由 txtFrScene.TextChanged → OnTaskEditChanged 即时接手
+        }
+
+        /// <summary>是否正在后台读取工程文件（防止选文件过程中重复触发）。</summary>
+        private bool _sceneLoading;
+
+        /// <summary>
+        /// 工程文件「…」加载后：在后台线程解析 .c4d 渲染设置，期间显示进度提示，
+        /// 读完后回到 UI 线程自动填入输出模板与帧范围。大文件不会卡住界面。
+        /// 只在确实读到有效值时覆盖；失败只写日志，不打断选择流程。
+        /// </summary>
+        private void TryAutoFillFromScene()
+        {
+            string scene = txtFrScene.Text.Trim();
+            if (scene.Length == 0) return;
+            if (_sceneLoading) return;
+
+            if (!File.Exists(scene))
+            {
+                AppendLog(new LogEntry(LogLevel.Warn,
+                    Localizer.Tf("log.sceneAutoMissing", "工程文件不存在，跳过渲染设置读取：{0}", scene)));
+                return;
+            }
+
+            _sceneLoading = true;
+            string hint = Localizer.T("log.sceneLoading", "正在读取工程渲染设置，请稍候…");
+            using (var dlg = new LoadingDialog(hint))
+            {
+                var worker = new System.ComponentModel.BackgroundWorker();
+                worker.DoWork += (sender, e) =>
+                {
+                    // 后台线程：只读文件、解析二进制，不触碰任何 UI 控件
+                    e.Result = C4dRenderSettingsReader.ReadAll(scene);
+                };
+                worker.RunWorkerCompleted += (sender, e) =>
+                {
+                    try
+                    {
+                        if (e.Error != null)
+                            AppendLog(new LogEntry(LogLevel.Warn,
+                                Localizer.Tf("log.sceneAutoFail", "读取工程渲染设置失败：{0}", e.Error.Message)));
+                        else
+                            ApplySceneInfo((List<C4dSceneRenderInfo>)e.Result, scene);
+                    }
+                    finally
+                    {
+                        _sceneLoading = false;
+                        dlg.Close();   // 结束 ShowDialog 的模态消息循环
+                    }
+                };
+                // 等 dialog 真正显示后再启动后台任务：确保 RunWorkerCompleted 里的
+                // dlg.Close() 一定发生在 ShowDialog 的消息循环内，避免极快读取时的关闭竞态。
+                dlg.Shown += (sender2, e2) => worker.RunWorkerAsync();
+                dlg.ShowDialog(this);   // 模态阻塞至读取完成，用户无法重复操作
+                worker.Dispose();
+            }
+        }
+
+        /// <summary>把后台读到的渲染设置回填到界面（只在 UI 线程调用）。</summary>
+        private void ApplySceneInfo(List<C4dSceneRenderInfo> all, string scene)
+        {
+            try
+            {
+                C4dSceneRenderInfo info = C4dRenderSettingsReader.PickActive(all);
+                bool changed = false;
+
+                if (!string.IsNullOrEmpty(info.OutputTemplate))
+                {
+                    txtFrOutput.Text = info.OutputTemplate;
+                    changed = true;
+                }
+
+                if (info.FrameRangeKnown)
+                {
+                    // 先设结束再设起始，避免中间状态出现「起 > 止」
+                    numFrEnd.Value = Clamp(info.EndFrame, numFrEnd);
+                    numFrStart.Value = Clamp(info.StartFrame, numFrStart);
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    string output = string.IsNullOrEmpty(info.OutputTemplate)
+                        ? Localizer.T("log.sceneAutoNoOutput", "(工程内未设置输出路径)")
+                        : info.OutputTemplate;
+                    string frames = info.FrameRangeKnown
+                        ? string.Format("{0}-{1}", info.StartFrame, info.EndFrame)
+                        : Localizer.T("log.sceneAutoDynamic", "由 C4D 动态解析，保留手填范围");
+                    AppendLog(new LogEntry(LogLevel.Info,
+                        Localizer.Tf("log.sceneAuto", "已读取工程渲染设置（第 {0} 组）：输出 {1}，帧 {2}",
+                                      info.BlockIndex + 1, output, frames)));
+                }
+
+                if (!string.IsNullOrEmpty(info.Note))
+                {
+                    LogLevel lv = (info.Truncated || !info.FrameRangeKnown) ? LogLevel.Warn : LogLevel.Info;
+                    string text = string.IsNullOrEmpty(info.NoteKey)
+                        ? info.Note
+                        : Localizer.Tf(info.NoteKey, info.Note, info.NoteArgs ?? new object[0]);
+                    AppendLog(new LogEntry(lv, text));
+                }
+
+                // 活动组帧范围由 C4D 动态解析时，列出工程内其它「可离线确定」的范围供参考；
+                // 不自动跨组拼数据，避免输出路径与帧范围来自不同设置。
+                if (!info.FrameRangeKnown)
+                {
+                    var hints = new List<string>();
+                    foreach (var other in all)
+                    {
+                        if (!ReferenceEquals(other, info) && other.FrameRangeKnown)
+                            hints.Add(string.Format("{0}-{1}", other.StartFrame, other.EndFrame));
+                    }
+                    if (hints.Count > 0)
+                        AppendLog(new LogEntry(LogLevel.Info,
+                            Localizer.Tf("log.sceneAutoOtherRanges",
+                                "工程内另有可离线读取的帧范围：{0}（如需使用，请在 C4D 中设为活动渲染设置后重新加载）",
+                                string.Join(", ", hints.ToArray()))));
+                }
+
+                // 显式写回：不依赖 TextChanged/ValueChanged（事件可能因 _suppressTaskSelect 被抑制）
+                CommitTaskFromUi();
+            }
+            catch (Exception ex)
+            {
+                AppendLog(new LogEntry(LogLevel.Warn,
+                    Localizer.Tf("log.sceneAutoFail", "读取工程渲染设置失败：{0}", ex.Message)));
+            }
         }
 
         private void BrowseFolder(TextBox target)

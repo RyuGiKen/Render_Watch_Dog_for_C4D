@@ -58,7 +58,9 @@
     <Compile Include="Services\FrameStateMap.cs" />
     <Compile Include="Services\Localizer.cs" />
     <Compile Include="Services\C4dPathLocator.cs" />
+    <Compile Include="Services\C4dRenderSettingsReader.cs" />
     <Compile Include="Services\KeepAwake.cs" />
+    <Compile Include="UI\LoadingDialog.cs" />
     <Compile Include="Services\TeamRenderController.cs" />
     <Compile Include="Services\FrameRenderController.cs" />
     <Compile Include="UI\MainForm.cs">
