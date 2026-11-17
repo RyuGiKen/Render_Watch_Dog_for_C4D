@@ -912,7 +912,8 @@ namespace RenderServerGui.UI
                 dlg.Title = Localizer.T("dlg.pickScene", "选择工程文件");
                 dlg.Filter = "Cinema 4D 工程 (*.c4d)|*.c4d|所有文件 (*.*)|*.*";
                 dlg.CheckFileExists = false;
-                TryFill(target, dlg, initialDirOf(target.Text));
+                // 取消对话框时不触发加载，避免用旧路径重复解析并覆盖用户已填参数
+                if (!TryFill(target, dlg, initialDirOf(target.Text))) return;
             }
             // 选中工程后，直接从 .c4d 二进制读取输出路径与帧范围（不启动 C4D、不依赖 Python）
             TryAutoFillFromScene();
@@ -1095,11 +1096,13 @@ namespace RenderServerGui.UI
             return string.Join("，", parts);
         }
 
-        private void TryFill(TextBox target, OpenFileDialog dlg, string initialDir)
+        /// <summary>显示文件对话框；返回是否真正选择了文件（取消返回 false，不改动原值）。</summary>
+        private bool TryFill(TextBox target, OpenFileDialog dlg, string initialDir)
         {
             if (initialDir != null && Directory.Exists(initialDir)) dlg.InitialDirectory = initialDir;
-            if (dlg.ShowDialog(this) == DialogResult.OK)
-                target.Text = dlg.FileName;
+            if (dlg.ShowDialog(this) != DialogResult.OK) return false;
+            target.Text = dlg.FileName;
+            return true;
         }
 
         // ---------- 关闭 ----------
