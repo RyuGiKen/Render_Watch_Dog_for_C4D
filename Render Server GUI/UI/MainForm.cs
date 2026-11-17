@@ -65,7 +65,7 @@ namespace RenderServerGui.UI
             SetRange(numFrStart, 0, 999999);
             SetRange(numFrEnd, 0, 999999);
             SetRange(numFrCooldown, 0, 86400);
-            SetRange(numFrTimeout, 1, 86400);
+            SetRange(numFrTimeout, 0, 86400);   // 0=不检测无进展超时
             SetRange(numFrInterval, 1, 86400);
             SetRange(numFrRetry, 1, 999);
             SetRange(numFrFail, 1, 999);

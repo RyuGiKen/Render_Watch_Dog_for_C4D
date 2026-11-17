@@ -19,3 +19,5 @@ log.sceneLoading=正在读取工程渲染设置，请稍候…
 log.tagAbnormal=异常! 
 log.tagNoResp=无响应! 
 log.taskkillFail=taskkill 执行失败({0}): {1}
+log.fr.taskBrief=  {2}（{0}/{1}）分块≤{3}  超时{4}
+log.fr.timeoutOff=不检测

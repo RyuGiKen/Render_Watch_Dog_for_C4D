@@ -83,7 +83,7 @@ dlg.preCount={0} and {1} more file(s)
 dlg.preexistTitle=Render process already running
 dlg.preexistBody=Detected {0} running "{1}" process(es).\n\n"Yes" = kill them and start the queue;\n"No" = stop this run (do not start, leave them untouched).
 log.fr.startCmd=Chunk render start: {0}  {1} task(s)
-log.fr.taskBrief=  {2} ({0}/{1})  chunk<={3}  timeout {4}s
+log.fr.taskBrief=  {2} ({0}/{1})  chunk<={3}  timeout {4}
 log.fr.taskStart=═══ {0} ({1}/{2}) ═══
 log.fr.stateScan=Frame state scan: {0}/{1} settled, {2} to render.
 log.fr.taskCooldown=Inter-task cooldown {0}s...
@@ -167,3 +167,4 @@ log.sceneAutoOtherRanges=Other frame ranges readable offline in this project: {0
 log.sceneNoteTimeline=Frame range mode {0} resolved from document timeline: frames {1}-{2}
 log.sceneNoteCurrentFrame=Frame range mode CURRENTFRAME resolved from document current frame: frame {0}
 log.sceneLoading=Reading project render settings, please wait…
+log.fr.timeoutOff=disabled

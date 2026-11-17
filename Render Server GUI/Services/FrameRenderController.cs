@@ -115,8 +115,11 @@ namespace RenderServerGui.Services
             for (int i = 0; i < tasks.Count; i++)
             {
                 var t = tasks[i];
-                LogInfo(Localizer.Tf("log.fr.taskBrief", "  {2}（{0}/{1}）分块≤{3}  超时{4}s",
-                    i + 1, tasks.Count, t.DisplayLabel, t.MaxChunkLength, t.FrameTimeoutSeconds));
+                string timeoutText = t.FrameTimeoutSeconds > 0
+                    ? t.FrameTimeoutSeconds + "s"
+                    : Localizer.T("log.fr.timeoutOff", "不检测");
+                LogInfo(Localizer.Tf("log.fr.taskBrief", "  {2}（{0}/{1}）分块≤{3}  超时{4}",
+                    i + 1, tasks.Count, t.DisplayLabel, t.MaxChunkLength, timeoutText));
             }
             LogInfo(Localizer.Tf("log.fr.params", "全局：检查间隔 {0}s，帧间冷却 {1}s，最大异常 {2}，帧最大失败 {3}，失败{4}",
                 _p.FrameCheckIntervalSeconds, _p.CooldownSeconds, _p.MaxAbnormalCount, _p.MaxFrameFailCount,
@@ -378,7 +381,9 @@ namespace RenderServerGui.Services
                     if (written > lastWritten) { lastWritten = written; lastProgress = DateTime.Now; }
                     if (scan.LatestWriteUtc > lastWriteUtc) { lastWriteUtc = scan.LatestWriteUtc; lastProgress = DateTime.Now; }
 
-                    bool noProgress = (DateTime.Now - lastProgress).TotalSeconds > _currentTask.FrameTimeoutSeconds;
+                    // FrameTimeoutSeconds=0 表示禁用无进展检测（永不判挂起杀进程）
+                    bool noProgress = _currentTask.FrameTimeoutSeconds > 0 &&
+                                      (DateTime.Now - lastProgress).TotalSeconds > _currentTask.FrameTimeoutSeconds;
                     bool crash = ProcessHealth.IsBugReportRecent(_p.ReportPath, crashWindow);
 
                     bool unresponsive = false;

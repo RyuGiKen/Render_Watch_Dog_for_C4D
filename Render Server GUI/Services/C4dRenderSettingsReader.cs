@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.IO.MemoryMappedFiles;
 
 namespace RenderServerGui.Services
 {
@@ -14,7 +15,7 @@ namespace RenderServerGui.Services
         /// <summary>二进制文件中的块序号（0 起）。</summary>
         public int BlockIndex { get; set; }
         /// <summary>该块在文件中的字节偏移，便于排查。</summary>
-        public int BlockOffset { get; set; }
+        public long BlockOffset { get; set; }
         /// <summary>块内条目数。</summary>
         public int EntryCount { get; set; }
 
@@ -50,6 +51,8 @@ namespace RenderServerGui.Services
         public string Note { get; set; }
         /// <summary>是否用文档时间轴补全了帧范围（ALLFRAMES/PREVIEWRANGE 模式）。</summary>
         public bool FromDocumentTimeline { get; set; }
+        /// <summary>是否从文件二进制的活动标志（块前 0F 10 00 00）判定为活动组。</summary>
+        public bool IsActiveFromFlag { get; set; }
     }
 
     /// <summary>
@@ -116,6 +119,11 @@ namespace RenderServerGui.Services
             if (all == null || all.Count == 0)
                 throw new InvalidDataException("文件中未找到渲染设置块");
 
+            // 权威标志优先：文件里若有块带活动标记（0F 10 00 00），直接用它。
+            for (int i = 0; i < all.Count; i++)
+                if (all[i].IsActiveFromFlag) return all[i];
+
+            // 回退启发式：输出路径非空 + 格式非默认 + 开启保存更像正在使用的设置。
             int best = 0, bestScore = int.MinValue;
             for (int i = 0; i < all.Count; i++)
             {
@@ -131,16 +139,40 @@ namespace RenderServerGui.Services
         public static List<C4dSceneRenderInfo> ReadAll(string c4dPath)
         {
             if (string.IsNullOrWhiteSpace(c4dPath)) throw new ArgumentException("工程路径为空");
-            byte[] data = File.ReadAllBytes(c4dPath);
-            if (data.Length < 16) throw new InvalidDataException("文件过小，不是有效的 .c4d");
+            // 内存映射读取：不把整个文件读进托管数组，规避 File.ReadAllBytes 的 ~2GB int 上限。
+            // 支持 7GB+ 工程；操作系统按需分页，常驻内存很小。
+            long fileLen = new FileInfo(c4dPath).Length;
+            if (fileLen < 16) throw new InvalidDataException("文件过小，不是有效的 .c4d");
+            if (fileLen > 7L * 1024 * 1024 * 1024)
+                throw new InvalidDataException("工程文件超过 7GB 上限");
 
-            string magic = Encoding.ASCII.GetString(data, 0, 4);
+            using (var mapped = new MappedFile(c4dPath))
+            {
+            return ReadAllCore(mapped);
+            }
+        }
+
+        private static List<C4dSceneRenderInfo> ReadAllCore(MappedFile data)
+        {
+            string magic = data.ReadAscii(0, 4);
             if (magic != "QC4D" && magic != "XC4D")
                 throw new InvalidDataException("不是可识别的 Cinema 4D 二进制工程（文件头 " + magic + "）");
 
-            var blocks = FindRenderBlocks(data);
-            var rangeStrings = FindFrameRangeStrings(data);
-            double[] timeline = FindDocumentTimeline(data);   // [currentSec, minSec, maxSec]，可能为 null
+            // C4D 把渲染设置对象写在文档末尾：先从尾部 32MB 扫描（毫秒级），
+            // 找不到再回退全文件，保证小文件/异常布局仍正确。
+            var blocks = FindRenderBlocks(data, data.ScanStart);
+            if (blocks.Count == 0 && data.ScanStart > 0)
+                blocks = FindRenderBlocks(data, 0);
+            var rangeStrings = FindFrameRangeStrings(data, data.ScanStart);
+            if (rangeStrings.Count == 0 && data.ScanStart > 0)
+                rangeStrings = FindFrameRangeStrings(data, 0);
+            double[] timeline = FindDocumentTimeline(data, data.ScanStart);   // [currentSec, minSec, maxSec]
+            if (timeline == null && data.ScanStart > 0)
+                timeline = FindDocumentTimeline(data, 0);   // 尾部没有时回退全文件
+
+            // 从二进制推断文档帧率（BaseTime 分母 LCM + 常见帧率约束）
+            double docFps = DetectDocumentFps(data, data.ScanStart);
+            if (docFps <= 0) docFps = 30.0;
 
             // CUSTOM 帧串归属：每个帧串归给「它前面最近的那一个块」。
             // 注意不能反过来按块去找后面的帧串——那样同一个帧串会被它后面的
@@ -192,15 +224,16 @@ namespace RenderServerGui.Services
                     OutputTemplate = BuildOutputTemplate(rawPath, nameFormat, ext),
                     FormatId = formatId,
                     FormatExtension = ext,
-                    Fps = fps,
+                    Fps = docFps,
                     FrameRangeKnown = false,
                     Truncated = false,
                     NoteKey = null,
                     NoteArgs = null,
-                    Note = string.Empty
+                    Note = string.Empty,
+                    IsActiveFromFlag = b.IsActive
                 };
 
-                ResolveFrameRange(info, map, seq, fps, step, rangeStr, timeline);
+                ResolveFrameRange(info, map, seq, docFps, step, rangeStr, timeline);
                 if (!saveImage && string.IsNullOrEmpty(info.Note))
                 {
                     info.NoteKey = "log.sceneNoteSaveOff";
@@ -467,21 +500,108 @@ namespace RenderServerGui.Services
 
         private sealed class Block
         {
-            public int Offset;
+            public long Offset;
             public List<Entry> Entries;
+            public bool IsActive;
         }
 
-        private static uint ReadU32(byte[] d, int o)
+        // ------------------------------------------------------------------
+        // 底层随机访问：用内存映射读取，偏移一律 long，规避 ~2GB 的 int 上限
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 内存映射的只读文件视图。通过 long 偏移随机读单字节/定长数值，
+        /// 不把文件加载进托管数组；7GB 工程也只按需分页，内存占用很小。
+        /// </summary>
+        private sealed class MappedFile : IDisposable
         {
-            return ((uint)d[o] << 24) | ((uint)d[o + 1] << 16) | ((uint)d[o + 2] << 8) | d[o + 3];
+            private readonly MemoryMappedFile _mmf;
+            private readonly MemoryMappedViewAccessor _acc;
+            public long Length { get; private set; }
+            /// <summary>扫描起点：优先从文件尾部窗口开始（C4D 渲染设置总在文档末尾）。</summary>
+            public long ScanStart { get; set; }
+
+            public MappedFile(string path)
+            {
+                Length = new FileInfo(path).Length;
+                ScanStart = Math.Max(0, Length - 32L * 1024 * 1024);   // 尾部 32MB 优先
+                _mmf = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+                _acc = _mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+            }
+
+            public byte Byte(long o) { return _acc.ReadByte(o); }
+
+            public uint U32BE(long o)
+            {
+                return ((uint)_acc.ReadByte(o) << 24) | ((uint)_acc.ReadByte(o + 1) << 16) |
+                       ((uint)_acc.ReadByte(o + 2) << 8) | _acc.ReadByte(o + 3);
+            }
+
+            public double F64BE(long o)
+            {
+                ulong v = 0;
+                for (int i = 0; i < 8; i++) v = (v << 8) | _acc.ReadByte(o + i);
+                return BitConverter.Int64BitsToDouble(unchecked((long)v));
+            }
+
+            public void ReadBlock(long o, byte[] buf) { _acc.ReadArray(o, buf, 0, buf.Length); }
+
+            public string ReadAscii(long o, int count)
+            {
+                var buf = new byte[count];
+                _acc.ReadArray(o, buf, 0, count);
+                return Encoding.ASCII.GetString(buf);
+            }
+
+            public string ReadUtf16BE(long o, int byteCount)
+            {
+                var buf = new byte[byteCount];
+                _acc.ReadArray(o, buf, 0, byteCount);
+                return Encoding.BigEndianUnicode.GetString(buf);
+            }
+
+            /// <summary>从 from 起找 pattern 首次出现位置（long 偏移）。</summary>
+            public long IndexOf(byte[] pattern, long from)
+            {
+                long n = Length;
+                int m = pattern.Length;
+                if (from < 0) from = 0;
+                if (m == 0 || from > n - m) return -1;
+                // 取信息量最大字节（非 00/FF）做锚，减少候选命中
+                int k = 0;
+                while (k < m && (pattern[k] == 0x00 || pattern[k] == 0xFF)) k++;
+                if (k == m) k = m - 1;
+                byte anchor = pattern[k];
+                var buf = new byte[256 * 1024];
+                long p = from;
+                while (p <= n - m)
+                {
+                    int want = (int)Math.Min((long)buf.Length, n - p);
+                    _acc.ReadArray(p, buf, 0, want);
+                    for (int j = 0; j <= want - m; j++)
+                    {
+                        if (buf[j + k] != anchor) continue;
+                        bool ok = true;
+                        for (int t = 0; t < m; t++)
+                            if (buf[j + t] != pattern[t]) { ok = false; break; }
+                        if (ok) return p + j;
+                    }
+                    p += want - m + 1;   // 保留重叠区，避免跨块边界漏匹配
+                    if (want < buf.Length) break;
+                }
+                return -1;
+            }
+
+            public void Dispose()
+            {
+                if (_acc != null) _acc.Dispose();
+                if (_mmf != null) _mmf.Dispose();
+            }
         }
 
-        private static double ReadF64BE(byte[] d, int o)
-        {
-            ulong v = 0;
-            for (int i = 0; i < 8; i++) v = (v << 8) | d[o + i];
-            return BitConverter.Int64BitsToDouble(unchecked((long)v));
-        }
+        private static uint ReadU32(MappedFile d, long o) { return d.U32BE(o); }
+
+        private static double ReadF64BE(MappedFile d, long o) { return d.F64BE(o); }
 
         /// <summary>定长类型的 value 字节数；返回 -1 表示不支持。</summary>
         private static int FixedSize(int type)
@@ -500,29 +620,29 @@ namespace RenderServerGui.Services
         }
 
         /// <summary>尝试读取一个 BaseContainer 条目，返回其结束偏移；失败返回 false。</summary>
-        private static bool TryReadEntry(byte[] d, int o, out Entry entry, out int next)
+        private static bool TryReadEntry(MappedFile d, long o, out Entry entry, out long next)
         {
             entry = default(Entry);
             next = o;
             if (o < 0 || o + 11 > d.Length) return false;
-            if (d[o] != EntryMarker || d[o + 5] != EntryMarker) return false;
+            if (d.Byte(o) != EntryMarker || d.Byte(o + 5) != EntryMarker) return false;
             uint t32 = ReadU32(d, o + 6);
-            int t8 = d[o + 10];
+            int t8 = d.Byte(o + 10);
             if (t32 != (uint)t8) return false;
             uint rawId = ReadU32(d, o + 1);
             if (rawId > int.MaxValue) return false;       // ID 超出 int 范围，跳过
             int id = (int)rawId;
-            int vs = o + 11;
+            long vs = o + 11;
             object value = null;
             int size;
 
             if (t8 == TypeString || t8 == TypeFilename)
             {
                 uint len = ReadU32(d, vs);
-                if (len > 1000000 || (long)vs + 4 + len > d.Length) return false;
+                if (len > 1000000 || vs + 4 + len > d.Length) return false;
                 int n = (int)len;
                 if (n % 2 != 0) n--;                     // UTF-16BE 必须是偶数长度
-                value = n > 0 ? Encoding.BigEndianUnicode.GetString(d, vs + 4, n) : string.Empty;
+                value = n > 0 ? d.ReadUtf16BE(vs + 4, n) : string.Empty;
                 size = 4 + (int)len;
             }
             else
@@ -556,13 +676,13 @@ namespace RenderServerGui.Services
         }
 
         /// <summary>从起点顺序解析连续条目，直到遇到不合法条目。</summary>
-        private static List<Entry> ReadChain(byte[] d, int start)
+        private static List<Entry> ReadChain(MappedFile d, long start)
         {
             var list = new List<Entry>();
-            int pos = start;
+            long pos = start;
             while (pos + 11 <= d.Length)
             {
-                Entry e; int next;
+                Entry e; long next;
                 if (!TryReadEntry(d, pos, out e, out next)) break;
                 list.Add(e);
                 pos = next;
@@ -571,26 +691,26 @@ namespace RenderServerGui.Services
         }
 
         /// <summary>以 RDATA_XRES(5008) 的大端字节为锚点定位全部渲染设置块。</summary>
-        private static List<Block> FindRenderBlocks(byte[] d)
+        private static List<Block> FindRenderBlocks(MappedFile d, long scanFrom)
         {
             var blocks = new List<Block>();
-            var seen = new HashSet<int>();
+            var seen = new HashSet<long>();
             byte[] anchor = { 0x00, 0x00, 0x13, 0x90 }; // 5008 BE
-            int idx = 0;
+            long idx = scanFrom;
             while (true)
             {
-                int p = IndexOf(d, anchor, idx);
+                long p = d.IndexOf(anchor, idx);
                 if (p < 0) break;
                 idx = p + 1;
 
                 Block best = null;
-                int from = Math.Max(0, p - 128);
-                for (int o = from; o <= p; o++)
+                long from = Math.Max(0, p - 128);
+                for (long o = from; o <= p; o++)
                 {
                     if (seen.Contains(o)) continue;
                     // 条目头还须满足第 6 字节也是 0x0F（布局 0F|id4|0F），先过滤掉绝大多数位置，
                     // 避免对随机字节调用 ReadChain（大文件里这里是主要耗时点）。
-                    if (o + 11 > d.Length || d[o] != EntryMarker || d[o + 5] != EntryMarker) continue;
+                    if (o + 11 > d.Length || d.Byte(o) != EntryMarker || d.Byte(o + 5) != EntryMarker) continue;
                     var chain = ReadChain(d, o);
                     if (chain.Count < 30) continue;
                     bool hasX = false, hasPath = false;
@@ -601,7 +721,19 @@ namespace RenderServerGui.Services
                     }
                     if (!hasX || !hasPath) continue;
                     if (best == null || chain.Count > best.Entries.Count)
-                        best = new Block { Offset = o, Entries = chain };
+                    {
+                        // 活动标志：块起始前约 24 字节处有 0F 10 00 00 XX（第二字节 0x10 = active）。
+                        // 该标志与 C4D 官方 GetActiveRenderData() 的活动设置一致。
+                        bool active = false;
+                        long chkFrom = Math.Max(0, o - 48);
+                        for (long q = chkFrom; q + 4 <= o; q++)
+                        {
+                            if (d.Byte(q) == 0x0F && d.Byte(q + 1) == 0x10 &&
+                                d.Byte(q + 2) == 0x00 && d.Byte(q + 3) == 0x00)
+                            { active = true; break; }
+                        }
+                        best = new Block { Offset = o, Entries = chain, IsActive = active };
+                    }
                 }
                 if (best != null)
                 {
@@ -613,78 +745,189 @@ namespace RenderServerGui.Services
             return blocks;
         }
 
-        /// <summary>全文件扫描 RDATA_FRAME_RANGE_STRING(5015) 的 STRING 条目，返回 (偏移, 文本)。</summary>
-        private static List<KeyValuePair<int, string>> FindFrameRangeStrings(byte[] d)
+        /// <summary>帧范围字符串是否是合法格式（数字、逗号、连字符、空格、分号）。</summary>
+        private static bool IsFrameRangeText(string s)
         {
-            var list = new List<KeyValuePair<int, string>>();
+            if (string.IsNullOrEmpty(s) || s.Length > 200) return false;
+            bool hasDigit = false;
+            foreach (char c in s)
+            {
+                if (c >= '0' && c <= '9') { hasDigit = true; continue; }
+                if (c == ',' || c == '-' || c == ' ' || c == ';' || c == ':') continue;
+                return false;
+            }
+            return hasDigit;
+        }
+
+        /// <summary>
+        /// 扫描帧范围字符串，支持两种存储格式：
+        ///   1) 标准条目头 0F|id=5015|0F|type=130/131|len|UTF-16BE
+        ///   2) 裸字符串 [u32 len][UTF-16BE]（无条目头）
+        /// 返回 (偏移, 文本)。
+        /// </summary>
+        private static List<KeyValuePair<long, string>> FindFrameRangeStrings(MappedFile d, long scanFrom)
+        {
+            var list = new List<KeyValuePair<long, string>>();
+
+            // 格式1：标准条目头
             byte[] pat = { EntryMarker, 0x00, 0x00, 0x13, 0x97, EntryMarker }; // 5015 BE
-            int idx = 0;
+            long idx = scanFrom;
             while (true)
             {
-                int p = IndexOf(d, pat, idx);
+                long p = d.IndexOf(pat, idx);
                 if (p < 0) break;
                 idx = p + 1;
-                Entry e; int next;
+                Entry e; long next;
                 if (!TryReadEntry(d, p, out e, out next)) continue;
                 if (e.Type != TypeString && e.Type != TypeFilename) continue;
                 var s = e.Value as string;
-                if (!string.IsNullOrEmpty(s)) list.Add(new KeyValuePair<int, string>(p, s));
+                if (!string.IsNullOrEmpty(s) && IsFrameRangeText(s))
+                    list.Add(new KeyValuePair<long, string>(p, s));
+            }
+
+            // 格式2：裸字符串 [u32 len][UTF-16BE]，len 为偶数且 2..100
+            long n = d.Length;
+            for (long p = scanFrom; p + 4 <= n; p++)
+            {
+                uint len = d.U32BE(p);
+                if (len < 2 || len > 100 || (len & 1) != 0) continue;
+                long end = p + 4 + len;
+                if (end > n) continue;
+                var s = d.ReadUtf16BE(p + 4, (int)len);
+                if (IsFrameRangeText(s))
+                    list.Add(new KeyValuePair<long, string>(p, s));
             }
             return list;
         }
 
         /// <summary>
-        /// 提取文档时间轴 [minSec, maxSec]。
+        /// 从文件推断文档帧率（fps）。
+        /// C4D 的文档 fps 不通过可靠 ID 存储（DOCUMENT_FPS=1001 被插件海量复用），
+        /// 但时间轴 BaseTime 的分子/分母 = 帧号/帧率（可能约分）。
+        /// 例：cur=91/30 -> 分母30=fps；cur=16/3 -> 160/30 约分，分母3 是 fps 的因子。
+        /// 算法：取所有 BaseTime 分母的 LCM，在常见帧率中选最接近 30（C4D 默认）的。
+        /// 实测多种工程均能正确推断出常见帧率。
+        /// </summary>
+        private static double DetectDocumentFps(MappedFile d, long scanFrom)
+        {
+            var dens = new List<double>();
+            long n = d.Length;
+            const int Elem = 17;
+            long limit = n - Elem * 4;
+            for (long baseOff = scanFrom; baseOff <= limit; baseOff += 1024 * 1024)
+            {
+                long want = Math.Min(1024 * 1024 + Elem * 5, n - baseOff);
+                var buf = new byte[(int)want];
+                d.ReadBlock(baseOff, buf);
+                long hi = want - Elem * 4;
+                for (int j = 0; j <= hi; j++)
+                {
+                    if (buf[j] != 0x16) continue;
+                    double num, den;
+                    if (!TryBareTimeParts(buf, j, out num, out den)) continue;
+                    if (den >= 1 && den <= 240) dens.Add(den);
+                }
+            }
+            if (dens.Count == 0) return 30.0;
+
+            // 分母的最小公倍数
+            double lcm = 1;
+            foreach (double x in dens)
+            {
+                double g = Gcd(lcm, x);
+                lcm = (lcm / g) * x;
+                if (lcm > 240) { lcm = 240; break; }
+            }
+            // 常见帧率中选 LCM 的倍数且最接近 30 的
+            double[] common = { 24, 25, 30, 50, 60 };
+            double best = 30.0, bestDiff = double.MaxValue;
+            foreach (double c in common)
+            {
+                if (Math.Abs(c % lcm) > 1e-9 && Math.Abs(lcm % c) > 1e-9) continue;
+                double diff = Math.Abs(c - 30.0);
+                if (diff < bestDiff) { bestDiff = diff; best = c; }
+            }
+            return best;
+        }
+
+        private static double Gcd(double a, double b)
+        {
+            while (b > 0.5) { double t = a % b; a = b; b = t; }
+            return a < 0.5 ? 1 : a;
+        }
+
+        private static bool TryBareTimeParts(byte[] b, int o, out double num, out double den)
+        {
+            num = 0; den = 0;
+            if (o + 17 > b.Length || b[o] != 0x16) return false;
+            ulong nu = 0, du = 0;
+            for (int i = 0; i < 8; i++) { nu = (nu << 8) | b[o + 1 + i]; du = (du << 8) | b[o + 9 + i]; }
+            num = BitConverter.Int64BitsToDouble(unchecked((long)nu));
+            den = BitConverter.Int64BitsToDouble(unchecked((long)du));
+            return den >= 1 && den <= 240 && num >= 0 && num <= 100000;
+        }
+
+        /// <summary>
+        /// 提取文档时间轴 [currentSec, minSec, maxSec]。
         /// Cinema 4D 把文档播放范围存成裸 BaseTime 数组，不走标准条目头：
         ///   元素 17 字节 = 0x16 | numerator:double(be) | denominator:double(be)
-        ///   数组形态为 [min, max, min, max]（同一对重复两遍）。
-        /// 实测：TESTSCENE(30fps) -> [0, 3.0] 即 0..90 帧；USB_OC(25fps) -> [0, 4.0] 即 0..100 帧。
-        /// 找不到返回 null，调用方退回「无法离线确定」。
+        /// 形态 [cur, min, max, min, max]（一对重复两遍）。找不到返回 null。
         /// </summary>
-        private static double[] FindDocumentTimeline(byte[] d)
+        private static double[] FindDocumentTimeline(MappedFile d, long scanFrom)
         {
-            int n = d.Length;
+            long n = d.Length;
             const int Elem = 17;
             double[] fallback4 = null;   // 4 元素形态：[NaN, min, max]
 
             // 单趟扫描同时尝试 5 元素与 4 元素形态，避免两次全文件遍历。
-            // 用 0x16 marker 快速过滤：绝大多数字节直接跳过。
-            int limit = n - Elem * 4;
-            for (int i = 0; i <= limit; i++)
+            long limit = n - Elem * 4;
+            // 分块批量读取，避免逐字节调用 accessor（2GB 文件里那是主要瓶颈）。
+            // 块之间保留 Elem*4 重叠，防止跨边界的 BaseTime 数组被切断。
+            const int Chunk = 1 * 1024 * 1024;
+            long overlap = Elem * 5;
+            for (long baseOff = scanFrom; baseOff <= limit; baseOff += Chunk)
             {
-                if (d[i] != 0x16) continue;
-                double v0, v1, v2, v3;
-                if (!TryBareTime(d, i, out v0)) continue;
-                if (!TryBareTime(d, i + Elem, out v1)) continue;
-                if (!TryBareTime(d, i + 2 * Elem, out v2)) continue;
-                if (!TryBareTime(d, i + 3 * Elem, out v3)) continue;
-
-                // 5 元素形态 [cur, min, max, min, max]：min 相等、max 相等、max > min。
-                // 实测 TESTSCENE: [0.3667s, 0s, 3s, 0s, 3s] -> 当前帧 11、范围 0..90 @30fps。
-                if (i + Elem * 5 <= n && Math.Abs(v1 - v3) < 1e-6)
+                long want = Math.Min((long)Chunk + overlap, n - baseOff);
+                var buf = new byte[(int)want];
+                d.ReadBlock(baseOff, buf);
+                long hi = want - Elem * 4;
+                for (int j = 0; j <= hi; j++)
                 {
-                    double v4;
-                    // v0=cur, v1=min, v2=max, v3=min, v4=max
-                    if (TryBareTime(d, i + 4 * Elem, out v4) &&
-                        Math.Abs(v2 - v4) < 1e-6 && v2 > v1)
-                        return new double[] { v0, v1, v2 };   // [current, min, max]
-                }
+                    if (buf[j] != 0x16) continue;
+                    double v0, v1, v2, v3;
+                    if (!TryBareTimeBuf(buf, j, out v0)) continue;
+                    if (!TryBareTimeBuf(buf, j + Elem, out v1)) continue;
+                    if (!TryBareTimeBuf(buf, j + 2 * Elem, out v2)) continue;
+                    if (!TryBareTimeBuf(buf, j + 3 * Elem, out v3)) continue;
 
-                // 4 元素形态 [min, max, min, max]，当前帧未知 -> NaN（仅在未找到 5 元素时回退）
-                if (fallback4 == null &&
-                    Math.Abs(v0 - v2) < 1e-6 && Math.Abs(v1 - v3) < 1e-6 && v1 > v0)
-                    fallback4 = new double[] { double.NaN, v0, v1 };
+                    // 5 元素形态 [cur, min, max, min, max]
+                    if (j + Elem * 5 <= buf.Length && Math.Abs(v1 - v3) < 1e-6)
+                    {
+                        double v4;
+                        if (TryBareTimeBuf(buf, j + 4 * Elem, out v4) &&
+                            Math.Abs(v2 - v4) < 1e-6 && v2 > v1)
+                            return new double[] { v0, v1, v2 };   // [current, min, max]
+                    }
+
+                    // 4 元素形态 [min, max, min, max]
+                    if (fallback4 == null &&
+                        Math.Abs(v0 - v2) < 1e-6 && Math.Abs(v1 - v3) < 1e-6 && v1 > v0)
+                        fallback4 = new double[] { double.NaN, v0, v1 };
+                }
             }
             return fallback4;
         }
 
-        /// <summary>读一个裸 BaseTime 元素（0x16 + 两个 double 秒数），值须在 [0,10000] 秒。</summary>
-        private static bool TryBareTime(byte[] d, int o, out double sec)
+        /// <summary>从内存块读裸 BaseTime 元素（与 TryBareTime 同规则）。</summary>
+        private static bool TryBareTimeBuf(byte[] b, int o, out double sec)
         {
             sec = 0;
-            if (o + 17 > d.Length || d[o] != 0x16) return false;
-            double num = ReadF64BE(d, o + 1);
-            double den = ReadF64BE(d, o + 9);
+            if (o + 17 > b.Length || b[o] != 0x16) return false;
+            // 大端 double：逐字节组装 ulong 再转 double
+            ulong nu = 0, du = 0;
+            for (int i = 0; i < 8; i++) { nu = (nu << 8) | b[o + 1 + i]; du = (du << 8) | b[o + 9 + i]; }
+            double num = BitConverter.Int64BitsToDouble(unchecked((long)nu));
+            double den = BitConverter.Int64BitsToDouble(unchecked((long)du));
             if (den == 0 || double.IsNaN(num) || double.IsNaN(den) ||
                 double.IsInfinity(num) || double.IsInfinity(den)) return false;
             if (Math.Abs(num) > 1e9 || Math.Abs(den) > 1e9) return false;
@@ -694,38 +937,19 @@ namespace RenderServerGui.Services
             return true;
         }
 
-        /// <summary>
-        /// 优化的字节序列搜索。取 pattern 中「信息量最大」的字节（非 00/FF，命中最少）作为锚点，
-        /// 用 Array.IndexOf（原生实现）快速定位，再校验整段，避免朴素 O(n*m) 在首字节 0x00 上反复比较。
-        /// </summary>
-        private static int IndexOf(byte[] data, byte[] pattern, int start)
+        /// <summary>读一个裸 BaseTime 元素（0x16 + 两个 double 秒数），值须在 [0,10000] 秒。</summary>
+        private static bool TryBareTime(MappedFile d, long o, out double sec)
         {
-            if (start < 0) start = 0;
-            int n = data.Length, m = pattern.Length;
-            if (m == 0 || start > n - m) return -1;
-
-            int k = 0;
-            while (k < m && (pattern[k] == 0x00 || pattern[k] == 0xFF)) k++;
-            if (k == m) k = m - 1;               // 全是 00/FF 时的退化处理
-            byte anchor = pattern[k];
-
-            int p = start;
-            while (p <= n - m)
-            {
-                int hit = Array.IndexOf(data, anchor, p);
-                if (hit < 0) return -1;
-                int candidate = hit - k;
-                if (candidate >= start && candidate <= n - m && MatchesAt(data, pattern, candidate))
-                    return candidate;
-                p = hit + 1;
-            }
-            return -1;
-        }
-
-        private static bool MatchesAt(byte[] data, byte[] pattern, int pos)
-        {
-            for (int j = 0; j < pattern.Length; j++)
-                if (data[pos + j] != pattern[j]) return false;
+            sec = 0;
+            if (o + 17 > d.Length || d.Byte(o) != 0x16) return false;
+            double num = ReadF64BE(d, o + 1);
+            double den = ReadF64BE(d, o + 9);
+            if (den == 0 || double.IsNaN(num) || double.IsNaN(den) ||
+                double.IsInfinity(num) || double.IsInfinity(den)) return false;
+            if (Math.Abs(num) > 1e9 || Math.Abs(den) > 1e9) return false;
+            double v = num / den;
+            if (v < 0 || v > 10000) return false;
+            sec = v;
             return true;
         }
 

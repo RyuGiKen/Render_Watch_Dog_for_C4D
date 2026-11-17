@@ -67,7 +67,7 @@ namespace RenderServerGui.Models
         /// <summary>帧间冷却（秒），避免过热。</summary>
         public int CooldownSeconds { get; set; }
 
-        /// <summary>无进展超时（秒）：连续这么久没有"新帧落定"即判挂起杀进程重试（分块后不再按每帧总时长）。</summary>
+        /// <summary>无进展超时（秒）：连续这么久没有"新帧落定"即判挂起杀进程重试（分块后不再按每帧总时长）；0=不检测。</summary>
         public int FrameTimeoutSeconds { get; set; }
 
         /// <summary>单帧模式轮询检查间隔（秒）。</summary>

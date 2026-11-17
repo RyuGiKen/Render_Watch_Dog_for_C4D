@@ -32,7 +32,7 @@ namespace RenderServerGui.Models
         /// <summary>最大分块长度：一个进程一次连渲的帧数上限。1=单帧；执行时自动夹到任务范围。</summary>
         public int MaxChunkLength { get; set; }
 
-        /// <summary>无进展超时（秒）：连续这么久没有"新帧落定"即判挂起杀进程重试。</summary>
+        /// <summary>无进展超时（秒）：连续这么久没有"新帧落定"即判挂起杀进程重试；0=不检测。</summary>
         public int FrameTimeoutSeconds { get; set; }
 
         /// <summary>
