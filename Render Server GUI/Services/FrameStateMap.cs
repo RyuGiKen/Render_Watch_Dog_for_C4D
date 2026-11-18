@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RenderServerGui.Services
 {
@@ -32,6 +33,67 @@ namespace RenderServerGui.Services
             End = end;
             // 0..start-1 天然为 Outside；范围内初始也视为 Outside，由 Load 填充 Missing/Settled
             _states = new byte[end + 1];
+        }
+
+        /// <summary>
+        /// 按显式帧列表构造：内部索引 = 帧在列表中的位置（0..Count-1），
+        /// 而非绝对帧号。用于不连续多帧任务，使游标/块尾判定仍可用连续索引逻辑。
+        /// </summary>
+        public FrameStateMap(List<int> frames)
+        {
+            Frames = frames ?? new List<int>();
+            Start = Frames.Count > 0 ? Frames[0] : 0;
+            End = Frames.Count > 0 ? Frames[Frames.Count - 1] : 0;
+            _states = new byte[Math.Max(1, Frames.Count)];
+        }
+
+        /// <summary>帧列表（按索引视图构造时非 null）；null 表示使用旧的绝对帧号语义。</summary>
+        public List<int> Frames { get; private set; }
+
+        /// <summary>索引视图下的帧数；旧模式返回 End-Start+1。</summary>
+        public int FrameCount => Frames != null ? Frames.Count : Math.Max(0, End - Start + 1);
+
+        /// <summary>索引 -> 绝对帧号（索引视图）；旧模式原样返回。</summary>
+        public int FrameAt(int i)
+        {
+            if (Frames != null) return i >= 0 && i < Frames.Count ? Frames[i] : -1;
+            return i;
+        }
+
+        /// <summary>按索引取状态（索引视图）。</summary>
+        public byte GetAt(int i)
+            => i >= 0 && i < _states.Length ? _states[i] : Outside;
+
+        /// <summary>按索引写状态（索引视图）。</summary>
+        public void SetAt(int i, byte state)
+        {
+            if (i >= 0 && i < _states.Length) _states[i] = state;
+        }
+
+        public bool IsSettledAt(int i) => GetAt(i) == Settled;
+
+        /// <summary>索引区间内已落定数。</summary>
+        public int CountSettledAt(int from, int to)
+        {
+            int n = 0;
+            for (int i = Math.Max(0, from); i <= Math.Min(_states.Length - 1, to); i++)
+                if (_states[i] == Settled) n++;
+            return n;
+        }
+
+        /// <summary>索引区间批量置状态。</summary>
+        public void MarkAt(int from, int to, byte state)
+        {
+            for (int i = Math.Max(0, from); i <= Math.Min(_states.Length - 1, to); i++)
+                _states[i] = state;
+        }
+
+        /// <summary>索引区间内第一个未落定的索引；全部落定返回 -1。</summary>
+        public int FirstUnsettledAt(int from, int to)
+        {
+            for (int i = Math.Max(0, from); i <= Math.Min(_states.Length - 1, to); i++)
+                if (_states[i] != Settled) return i;
+            return -1;
         }
 
         /// <summary>取某帧状态；越界返回 Outside。</summary>

@@ -160,7 +160,7 @@ log.sceneAuto=Read project render settings (group {0}): output {1}, frames {2}
 log.sceneAutoNoOutput=(no output path set in project)
 log.sceneAutoDynamic=resolved by C4D at runtime, keeping manual frame range
 log.sceneNoteSaveOff=Save Image is disabled in the project; the output path may not be written
-log.sceneNoteManualStep=Manual step={0}; frame numbers are not consecutive, using only first frame {1}
+log.sceneNoteManualStep=Manual step={0}; frame list {1} (rendered in consecutive runs)
 log.sceneNoteTruncated=Custom frame list {0} is not consecutive; using only first run {1}-{2}
 log.sceneNoteDynamic=Frame range mode {0} is resolved by C4D at runtime; the file has no explicit frame numbers, keeping manual range
 log.sceneAutoOtherRanges=Other frame ranges readable offline in this project: {0} (to use one, set it as the active render setting in C4D and reload)
@@ -168,3 +168,9 @@ log.sceneNoteTimeline=Frame range mode {0} resolved from document timeline: fram
 log.sceneNoteCurrentFrame=Frame range mode CURRENTFRAME resolved from document current frame: frame {0}
 log.sceneLoading=Reading project render settings, please wait…
 log.fr.timeoutOff=disabled
+log.sceneNoteCustomFrames=Custom frame list {0} (non-consecutive, rendered in consecutive runs)
+ui.frameSpec=Frame list
+msg.badFrameSpec=Frame list has no valid frame numbers.
+ui.useFrameSpec=Use frame list
+ui.specActual=Render frames: {0}
+ui.specEmpty=(no valid frames)

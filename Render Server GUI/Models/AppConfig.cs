@@ -151,6 +151,7 @@ namespace RenderServerGui.Models
                     string key = string.Join("\u0001",
                         t.SceneFile ?? "", t.OutputTemplate ?? "",
                         t.StartFrame.ToString(), t.EndFrame.ToString(),
+                        t.FrameSpec ?? "",
                         t.MaxChunkLength.ToString(), t.FrameTimeoutSeconds.ToString());
                     if (seen.Add(key)) result.Add(t);
                 }

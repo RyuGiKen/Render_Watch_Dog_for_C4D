@@ -288,7 +288,7 @@ namespace RenderServerGui.UI
             this.tflFrame.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 165F)); // 标签列固定宽，使文本框/数字框/下拉统一从 x=150 起（中英对齐）
             this.tflFrame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             this.tflFrame.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            for (int i = 0; i < 14; i++) this.tflFrame.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            for (int i = 0; i < 15; i++) this.tflFrame.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             this.tflFrame.RowStyles[7] = new RowStyle(SizeType.Absolute, 140F); // 任务列表行
 
             this.lblFrExe = MakeLabel("lblFrExe", "主程序路径"); this.tflFrame.Controls.Add(this.lblFrExe, 0, 0);
@@ -359,7 +359,7 @@ namespace RenderServerGui.UI
             this.txtFrOutput = MakeText(); this.tflFrame.Controls.Add(this.txtFrOutput, 1, 10);
             this.btnFrOutput = MakeBrowse(); this.btnFrOutput.Name = "btnFrOutput"; this.tflFrame.Controls.Add(this.btnFrOutput, 2, 10);
 
-            // 帧范围行：普通 Panel + 绝对坐标，加大 ~ 与输入框间距，row 11
+            // 帧范围行（默认/最常用）：普通 Panel + 绝对坐标，加大 ~ 与输入框间距，row 11
             this.lblFrStart = MakeLabel("lblFrStart", "帧范围(起~止)"); this.tflFrame.Controls.Add(this.lblFrStart, 0, 11);
             this.pnlRange.Name = "pnlRange"; this.pnlRange.AutoSize = false; this.pnlRange.Size = new Size(380, 28); this.pnlRange.Margin = new Padding(0, 4, 0, 0);
             this.numFrStart = MakeNum(80); this.numFrStart.Name = "numFrStart"; this.numFrStart.Location = new Point(0, 2);
@@ -372,6 +372,17 @@ namespace RenderServerGui.UI
             this.pnlRange.Controls.Add(this.lblRangeCount);
             this.tflFrame.Controls.Add(this.pnlRange, 1, 11); this.tflFrame.SetColumnSpan(this.pnlRange, 2);
 
+            // 帧串行（可选）：左侧 toggle，右侧输入框 + 实际帧预览，row 12。默认关闭、输入框置灰。
+            // toggle 放 col0（与其他标签左对齐）；pnlSpec 宽与 pnlRange 对齐(380)，避免撑宽整列导致右侧溢出。
+            this.chkFrameSpec = new CheckBox(); this.chkFrameSpec.Name = "chkFrameSpec"; this.chkFrameSpec.Text = "使用帧串"; this.chkFrameSpec.AutoSize = true; this.chkFrameSpec.Margin = new Padding(3, 8, 3, 3); this.chkFrameSpec.UseVisualStyleBackColor = true;
+            this.tflFrame.Controls.Add(this.chkFrameSpec, 0, 12);
+            var pnlSpec = new Panel(); pnlSpec.Name = "pnlSpec"; pnlSpec.AutoSize = false; pnlSpec.Size = new Size(380, 28); pnlSpec.Margin = new Padding(0, 4, 0, 0);
+            this.lblFrameSpec = MakeLabel("lblFrameSpec", "帧串"); this.lblFrameSpec.AutoSize = true; this.lblFrameSpec.Location = new Point(0, 5); this.lblFrameSpec.Margin = new Padding(0);
+            this.txtFrameSpec = new TextBox(); this.txtFrameSpec.Name = "txtFrameSpec"; this.txtFrameSpec.Location = new Point(32, 2); this.txtFrameSpec.Size = new Size(120, 23); this.txtFrameSpec.Enabled = false;
+            this.lblSpecActual = MakeLabel("lblSpecActual", "实际渲染："); this.lblSpecActual.AutoSize = false; this.lblSpecActual.Size = new Size(220, 20); this.lblSpecActual.AutoEllipsis = true; this.lblSpecActual.ForeColor = Color.Gray; this.lblSpecActual.Location = new Point(158, 5); this.lblSpecActual.Margin = new Padding(0);
+            pnlSpec.Controls.Add(this.lblFrameSpec); pnlSpec.Controls.Add(this.txtFrameSpec); pnlSpec.Controls.Add(this.lblSpecActual);
+            this.tflFrame.Controls.Add(pnlSpec, 1, 12); this.tflFrame.SetColumnSpan(pnlSpec, 2);
+
             // 最大分块 + 无进展超时：并排一行（普通 Panel + 绝对坐标），row 12
             var pnlPair3 = new Panel(); pnlPair3.Name = "pnlPair3"; pnlPair3.AutoSize = false; pnlPair3.Size = new Size(540, 28); pnlPair3.Margin = new Padding(3, 4, 3, 3);
             this.lblMaxChunk = MakeLabel("lblMaxChunk", "最大分块长度"); this.lblMaxChunk.Location = new Point(0, 6); this.lblMaxChunk.Margin = new Padding(0);
@@ -380,11 +391,11 @@ namespace RenderServerGui.UI
             this.numFrTimeout = MakeNum(90); this.numFrTimeout.Name = "numFrTimeout"; this.numFrTimeout.Location = new Point(445, 3); this.numFrTimeout.Margin = new Padding(0);
             pnlPair3.Controls.Add(this.lblMaxChunk); pnlPair3.Controls.Add(this.numMaxChunk);
             pnlPair3.Controls.Add(this.lblFrTimeout); pnlPair3.Controls.Add(this.numFrTimeout);
-            this.tflFrame.Controls.Add(pnlPair3, 0, 12); this.tflFrame.SetColumnSpan(pnlPair3, 3);
+            this.tflFrame.Controls.Add(pnlPair3, 0, 13); this.tflFrame.SetColumnSpan(pnlPair3, 3);
 
             this.btnFrPreview.AutoSize = true; this.btnFrPreview.Name = "btnFrPreview"; this.btnFrPreview.Text = "预览输出文件名并校验目录";
             this.btnFrPreview.UseVisualStyleBackColor = true; this.btnFrPreview.Anchor = AnchorStyles.Top | AnchorStyles.Left; this.btnFrPreview.Margin = new Padding(3, 8, 3, 3);
-            this.tflFrame.Controls.Add(this.btnFrPreview, 1, 13); this.tflFrame.SetColumnSpan(this.btnFrPreview, 2);
+            this.tflFrame.Controls.Add(this.btnFrPreview, 1, 14); this.tflFrame.SetColumnSpan(this.btnFrPreview, 2);
 
             // panelLog：顶部 Padding 预留标题行，标题/清空按钮作锚定子控件，rtbLog 用 Dock.Fill 落在 Padding 之下
             // （不依赖子面板 z-order，首帧即对齐，无需缩放窗口才归位）
@@ -407,8 +418,8 @@ namespace RenderServerGui.UI
             // 避免 AutoScaleMode.Font 在 .NET FW 4.7.2 + PerMonitorV2 下因子算成 1、字体放大而控件高度不变导致文字被裁半行
             this.AutoScaleDimensions = new SizeF(96F, 96F);
             this.AutoScaleMode = AutoScaleMode.Dpi;
-            this.ClientSize = new Size(1100, 672);
-            this.MinimumSize = new Size(820, 520);
+            this.ClientSize = new Size(1100, 712);   // 新增帧串切换行后增高，刚好显示完整
+            this.MinimumSize = new Size(820, 560);
             this.Controls.Add(this.panelLog);
             this.Controls.Add(this.panelParams);
             this.Controls.Add(this.panelTop);
@@ -534,6 +545,10 @@ namespace RenderServerGui.UI
         private Label lblFrEnd;
         private NumericUpDown numFrEnd;
         private Label lblRangeCount;
+        private CheckBox chkFrameSpec;
+        private Label lblFrameSpec;
+        private TextBox txtFrameSpec;
+        private Label lblSpecActual;
         private Label lblMaxChunk;
         private NumericUpDown numMaxChunk;
         private Label lblFrTimeout;

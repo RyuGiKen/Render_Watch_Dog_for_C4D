@@ -199,55 +199,50 @@ namespace RenderServerGui.Services
 
         /// <summary>
         /// 执行单个任务的分块渲染循环。返回 true=正常完成，false=熔断跳过。
+        /// 支持不连续多帧：任务帧列表拆成若干连续段，段内按索引推进，
+        /// 每个块映射回帧号后交给 C4D 的 -frame 参数（含 step）。
         /// </summary>
         private bool RunSingleTask(int taskIndex, int taskCount)
         {
-            int start = _currentTask.StartFrame, end = _currentTask.EndFrame;
-            int total = end - start + 1;
+            List<int> frames = _currentTask.GetFrames();
+            int total = frames.Count;
             if (total <= 0)
             {
                 LogError(Localizer.T("log.fr.noFrames", "结束帧小于起始帧，无帧可渲染。"));
                 return true; // 不算熔断，直接跳过
             }
 
-            // 任务启动、渲染进程尚未拉起、机器空载：一次目录枚举建立帧状态表。
-            // 落定判定沿用 CooldownSeconds，避免把孤儿 C4D 进程仍在写的半成品算作成品。
-            _frameMap = new FrameStateMap(start, end);
-            _frameMap.Load(FrameScanner.ScanSettledStates(_currentTask.OutputTemplate, start, end, _p.CooldownSeconds));
-            int settledAtStart = _frameMap.CountSettled(start, end);
+            // 任务启动、渲染进程尚未拉起、机器空载：一次目录枚举建立帧状态表（索引=帧列表位置）。
+            _frameMap = new FrameStateMap(frames);
+            _frameMap.Load(FrameScanner.ScanSettledStatesByFrames(_currentTask.OutputTemplate, frames, _p.CooldownSeconds));
+            int settledAtStart = _frameMap.CountSettledAt(0, total - 1);
             LogInfo(Localizer.Tf("log.fr.stateScan", "帧状态扫描：{0}/{1} 帧已落定，{2} 帧待渲。",
                 settledAtStart, total, total - settledAtStart));
 
             int N = Math.Max(1, _currentTask.MaxChunkLength);
-            int cursor = start;
+            int cursor = 0;                 // 帧列表索引
             int consecStall = 0;
-            int accounted = 0;
             int preIdle = 0;
 
-            while (cursor <= end && !_stopRequested)
+            while (cursor < total && !_stopRequested)
             {
-                // 跳过已落定的帧（续渲/重叠）——查表，不再逐帧 stat
-                while (cursor <= end && _frameMap.IsSettled(cursor)) cursor++;
-                if (cursor > end) break;
+                while (cursor < total && _frameMap.IsSettledAt(cursor)) cursor++;
+                if (cursor >= total) break;
 
                 int fa = cursor;
-                // 块尾必须停在下一个已落定帧之前：C4D 的 -frame a b 1 是连续区间，
-                // 无法跳过区间内已完成帧，越过就会覆盖重渲（浪费算力，且可能损坏已有成品）。
-                // hi 先按 N 收敛上限，避免全缺时一路扫到末帧。
-                int hi = Math.Min(end, fa + N - 1);
+                // 块尾停在下一个已落定帧之前，避免覆盖重渲已有成品。
+                int hi = Math.Min(total - 1, fa + N - 1);
                 int fb = fa;
-                while (fb < hi && !_frameMap.IsSettled(fb + 1)) fb++;
+                while (fb < hi && !_frameMap.IsSettledAt(fb + 1)) fb++;
                 int focusFail = 0;
 
                 while (true)
                 {
                     if (_stopRequested) break;
-
-                    // 启动前空载冷却（此间无渲染进程）
                     if (preIdle > 0 && !SleepIdle(preIdle)) break;
 
                     BlockOutcome oc = RunBlock(fa, fb);
-                    ApplyBlockResult(fa, fb, oc);   // 按实际产物更新帧状态表
+                    ApplyBlockResult(fa, fb, oc);
                     if (oc == BlockOutcome.Abort) { _stopRequested = true; break; }
 
                     if (oc == BlockOutcome.SuccessKilled)
@@ -256,19 +251,15 @@ namespace RenderServerGui.Services
                     }
                     if (oc == BlockOutcome.SuccessExited)
                     {
-                        // 块间散热：帧间冷却 + 一个检查间隔（默认 60+30=90s，无渲染进程、空载）。
-                        // 原实现的散热由"落定需距写入≥帧间冷却"在块尾自然形成；改造去掉该判据后
-                        // 必须显式保留同等时长，不得缩短。CooldownSeconds 的注释本就是「避免过热」。
                         consecStall = 0;
                         preIdle = _p.CooldownSeconds + _p.FrameCheckIntervalSeconds;
                         cursor = fb + 1; break;
                     }
 
-                    // 失败：按帧状态表决定游标
-                    int newFirst = _frameMap.FirstUnsettled(fa, fb);
+                    int newFirst = _frameMap.FirstUnsettledAt(fa, fb);
                     if (newFirst < 0) { consecStall = 0; preIdle = _p.FrameCheckIntervalSeconds; cursor = fb + 1; break; }
 
-                    if (newFirst > fa) // 有进展：游标推到缺口，重取块
+                    if (newFirst > fa)
                     {
                         consecStall = 0;
                         cursor = newFirst;
@@ -276,56 +267,63 @@ namespace RenderServerGui.Services
                         break;
                     }
 
-                    // 原地卡起点帧
                     preIdle = _p.CooldownSeconds;
                     focusFail++;
                     if (focusFail >= _p.MaxFrameFailCount)
                     {
                         if (_p.OnFail == OnFailBehaviour.Stop)
                         {
-                            LogWarn(Localizer.Tf("log.fr.frameStop", "帧 {0} 连续 {1} 次尝试无进展，按策略停止当前任务。", fa, focusFail));
-                            cursor = end + 1;
+                            int stopFrame = _frameMap.FrameAt(fa);
+                            LogWarn(Localizer.Tf("log.fr.frameStop", "帧 {0} 连续 {1} 次尝试无进展，按策略停止当前任务。", stopFrame, focusFail));
+                            cursor = total;
                             break;
                         }
                         consecStall++;
-                        LogWarn(Localizer.Tf("log.fr.frameSkip", "帧 {0} 连续 {1} 次尝试无进展，跳过该帧。", fa, focusFail));
+                        int skipFrame = _frameMap.FrameAt(fa);
+                        LogWarn(Localizer.Tf("log.fr.frameSkip", "帧 {0} 连续 {1} 次尝试无进展，跳过该帧。", skipFrame, focusFail));
                         cursor = fa + 1;
                         break;
                     }
-                    LogWarn(Localizer.Tf("log.fr.frameRetry", "帧 {0} 第 {1}/{2} 次尝试无进展，重启本块。", fa, focusFail, _p.MaxFrameFailCount));
+                    int retryFrame = _frameMap.FrameAt(fa);
+                    LogWarn(Localizer.Tf("log.fr.frameRetry", "帧 {0} 第 {1}/{2} 次尝试无进展，重启本块。", retryFrame, focusFail, _p.MaxFrameFailCount));
                 }
 
-                accounted = Clamp(cursor - start, 0, total);
-                RaiseProgress(accounted, total, Math.Min(cursor, end + 1),
+                int accounted = Clamp(cursor, 0, total);
+                int progressFrame = cursor < total ? _frameMap.FrameAt(cursor) : (frames.Count > 0 ? frames[frames.Count - 1] : 0);
+                RaiseProgress(accounted, total, progressFrame,
                     Localizer.Tf("log.fr.taskProgress", "任务 {0}/{1}", taskIndex + 1, taskCount));
 
                 if (_stopRequested) break;
                 if (consecStall >= CircuitBreakerBlocks)
                 {
                     LogError(Localizer.Tf("log.fr.circuitBreak", "连续 {0} 块都在起点即失败、毫无进展，疑似资产缺失/未烘缓存/授权等全局问题，跳过当前任务。", consecStall));
-                    return false; // 熔断，跳任务
+                    return false;
                 }
             }
 
-            VerifyFinishedFrames(start, end);
+            VerifyFinishedFrames(frames);
 
             LogInfo(Localizer.Tf("log.fr.taskDone", "{0} 完成：已推进 {1}/{2} 帧。",
-                _currentTask.DisplayLabel, Clamp(cursor - start, 0, total), total));
+                _currentTask.DisplayLabel, Clamp(cursor, 0, total), total));
             return true;
         }
 
         // ================= 内层：一个进程渲 [a,b] 的观察 =================
 
-        /// <summary>内层：启动一个进程渲块 [a,b]，按检查间隔轮询，返回细分结束原因。无进展按产物写入活动判定；秒退/崩溃报告保留异常计数去抖。</summary>
-        private BlockOutcome RunBlock(int a, int b)
+        /// <summary>内层：启动一个进程渲块 [fa,fb]（帧列表索引），按检查间隔轮询，返回细分结束原因。无进展按产物写入活动判定；秒退/崩溃报告保留异常计数去抖。</summary>
+        private BlockOutcome RunBlock(int fa, int fb)
         {
             Process process = null;
+            // fa/fb 是帧列表索引；a/b 为对应绝对帧号，供命令行与日志使用
+            int a = _frameMap.FrameAt(fa);
+            int b = _frameMap.FrameAt(fb);
             try
             {
+                if (a < 0 || b < a) return BlockOutcome.Abort;
                 var psi = new ProcessStartInfo
                 {
                     FileName = _p.ExePath,
-                    Arguments = BuildArguments(a, b),
+                    Arguments = BuildArguments(fa, fb),
                     UseShellExecute = false
                 };
                 try { psi.WorkingDirectory = Path.GetDirectoryName(_p.ExePath); } catch { }
@@ -348,7 +346,7 @@ namespace RenderServerGui.Services
                 var lastWriteUtc = DateTime.MinValue;   // 块内产物最近见到的写入时刻；mtime 前进 = 渲染在正常产出
                 DateTime? noProgressSince = null;       // 无进展超时首现时刻（下一轮复查仍超时才杀）
                 bool loggedNoResp = false;
-                int blockLen = b - a + 1;
+                int blockLen = fb - fa + 1;
 
                 while (true)
                 {
@@ -356,7 +354,7 @@ namespace RenderServerGui.Services
 
                     // 一次块内目录枚举，同时得到"存在且非空"的帧数与块内最新写入时刻，
                     // 替代原来的逐帧 CountSettled + 全目录 GetLatestWriteTimeUtc 两次扫描。
-                    var scan = FrameScanner.ScanBlock(_currentTask.OutputTemplate, a, b);
+                    var scan = FrameScanner.ScanBlockByFrames(_currentTask.OutputTemplate, _frameMap.Frames, fa, fb);
                     int written = scan.NonEmptyCount;
                     bool allWritten = written >= blockLen;
                     bool exited = SafeExited(process);
@@ -470,23 +468,23 @@ namespace RenderServerGui.Services
         /// 失败 → 一次块内枚举，首个"不存在或为空"之前的帧置已落定，其余保持未落定待重渲。
         /// 结算口径用"存在且非空"而非冷却：进程已退出即写入完成，冷却只用于启动扫描与 SuccessKilled 静默期。
         /// </summary>
-        private void ApplyBlockResult(int a, int b, BlockOutcome oc)
+        private void ApplyBlockResult(int fa, int fb, BlockOutcome oc)
         {
             if (oc == BlockOutcome.Abort || _frameMap == null) return;
 
             if (oc == BlockOutcome.SuccessExited || oc == BlockOutcome.SuccessKilled)
             {
-                _frameMap.Mark(a, b, FrameStateMap.Settled);
+                _frameMap.MarkAt(fa, fb, FrameStateMap.Settled);
                 return;
             }
 
-            var scan = FrameScanner.ScanBlock(_currentTask.OutputTemplate, a, b);
+            var scan = FrameScanner.ScanBlockByFrames(_currentTask.OutputTemplate, _frameMap.Frames, fa, fb);
             int first = scan.FirstMissing();
-            if (first < 0) _frameMap.Mark(a, b, FrameStateMap.Settled);
+            if (first < 0) _frameMap.MarkAt(fa, fb, FrameStateMap.Settled);
             else
             {
-                _frameMap.Mark(a, first - 1, FrameStateMap.Settled);
-                _frameMap.Mark(first, b, FrameStateMap.Missing);
+                _frameMap.MarkAt(fa, first - 1, FrameStateMap.Settled);
+                _frameMap.MarkAt(first, fb, FrameStateMap.Missing);
             }
         }
 
@@ -496,13 +494,13 @@ namespace RenderServerGui.Services
         /// 不自愈（回退 cursor 需改循环结构），下次启动会重新扫描并补渲。
         /// 复核用 minAge=0，只核存在与大小，与时间无关。
         /// </summary>
-        private void VerifyFinishedFrames(int start, int end)
+        private void VerifyFinishedFrames(List<int> frames)
         {
             if (_frameMap == null) return;
-            byte[] actual = FrameScanner.ScanSettledStates(_currentTask.OutputTemplate, start, end, 0);
+            byte[] actual = FrameScanner.ScanSettledStatesByFrames(_currentTask.OutputTemplate, frames, 0);
             var missing = new List<int>();
-            for (int f = start; f <= end && f < actual.Length; f++)
-                if (_frameMap.IsSettled(f) && actual[f] != FrameStateMap.Settled) missing.Add(f);
+            for (int i = 0; i < frames.Count && i < actual.Length; i++)
+                if (_frameMap.IsSettledAt(i) && actual[i] != FrameStateMap.Settled) missing.Add(frames[i]);
             if (missing.Count == 0) return;
 
             int shown = Math.Min(50, missing.Count);
@@ -520,13 +518,27 @@ namespace RenderServerGui.Services
 
         // ---------- 进程与参数 ----------
 
-        /// <summary>构造渲染参数：N=1（a==b）用 `-frame a`，否则渲范围 `-frame a b 1`；带工程文件路径并加引号。</summary>
-        private string BuildArguments(int a, int b)
+        /// <summary>
+        /// 构造渲染参数：fa/fb 为帧列表索引，映射回绝对帧号。
+        /// 段内等差时生成 `-frame a b step`（C4D 支持步进），单帧用 `-frame a`。
+        /// </summary>
+        private string BuildArguments(int fa, int fb)
         {
             string scene = (_currentTask.SceneFile ?? string.Empty).Trim();
             string head = scene.Length > 0 ? $"-render \"{scene}\"" : "-render";
-            // N=1（a==b）沿用单帧旧格式 "-frame a"，否则渲范围 "-frame a b 1"
-            return b > a ? $"{head} -frame {a} {b} 1" : $"{head} -frame {a}";
+            int a = _frameMap.FrameAt(fa);
+            int b = _frameMap.FrameAt(fb);
+            if (a < 0) return head;
+            if (a == b) return $"{head} -frame {a}";
+
+            // 由帧列表推算本段步进（相邻帧差）；不连续处已被拆成不同块，块内必等差
+            int step = 1;
+            if (fb > fa)
+            {
+                int stepCandidate = _frameMap.FrameAt(fa + 1) - a;
+                if (stepCandidate > 1) step = stepCandidate;
+            }
+            return $"{head} -frame {a} {b} {step}";
         }
 
         /// <summary>杀整棵进程树。杀后立即返回，由游标推进/重试决定下一步；不做额外空载等待。</summary>

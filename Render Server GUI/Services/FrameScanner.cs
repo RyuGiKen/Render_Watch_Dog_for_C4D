@@ -223,6 +223,72 @@ namespace RenderServerGui.Services
         }
 
         /// <summary>
+        /// 按显式帧列表扫描落定状态：返回数组下标 = frames 中的位置。
+        /// 用于不连续多帧任务；不在列表中的帧即使存在也不计入。
+        /// </summary>
+        public static byte[] ScanSettledStatesByFrames(string template, List<int> frames, int minAgeSeconds)
+        {
+            var states = new byte[frames.Count];
+            for (int i = 0; i < states.Length; i++) states[i] = FrameStateMap.Missing;
+
+            Regex re = BuildFrameNameRegex(template);
+            if (re == null) return states;
+            string dir = Path.GetDirectoryName(template);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return states;
+
+            // 帧号 -> 索引 映射，避免逐文件线性查找
+            var index = new Dictionary<int, int>();
+            for (int i = 0; i < frames.Count; i++)
+                if (!index.ContainsKey(frames[i])) index[frames[i]] = i;
+
+            try
+            {
+                foreach (FileInfo fi in new DirectoryInfo(dir).EnumerateFiles())
+                {
+                    int frame;
+                    if (!TryParseFrame(re, fi.Name, out frame)) continue;
+                    int i;
+                    if (!index.TryGetValue(frame, out i)) continue;
+                    if (fi.Length <= 0) continue;
+                    if (minAgeSeconds > 0 &&
+                        (DateTime.UtcNow - fi.LastWriteTimeUtc).TotalSeconds < minAgeSeconds) continue;
+                    states[i] = FrameStateMap.Settled;
+                }
+            }
+            catch { }
+            return states;
+        }
+
+        /// <summary>按帧列表统计块 [fromIdx,toIdx] 内存在且非空的产物数与最新写入时刻。</summary>
+        public static ByFrameBlockScan ScanBlockByFrames(string template, List<int> frames, int fromIdx, int toIdx)
+        {
+            var scan = new ByFrameBlockScan(frames, fromIdx, toIdx);
+            Regex re = BuildFrameNameRegex(template);
+            if (re == null) return scan;
+            string dir = Path.GetDirectoryName(template);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return scan;
+
+            var index = new Dictionary<int, int>();
+            for (int i = fromIdx; i <= toIdx && i < frames.Count; i++)
+                if (!index.ContainsKey(frames[i])) index[frames[i]] = i;
+
+            try
+            {
+                foreach (FileInfo fi in new DirectoryInfo(dir).EnumerateFiles())
+                {
+                    int frame;
+                    if (!TryParseFrame(re, fi.Name, out frame)) continue;
+                    int i;
+                    if (!index.TryGetValue(frame, out i)) continue;
+                    if (fi.LastWriteTimeUtc > scan.LatestWriteUtc) scan.SetLatestWriteUtc(fi.LastWriteTimeUtc);
+                    if (fi.Length > 0) scan.MarkPresent(i);
+                }
+            }
+            catch { }
+            return scan;
+        }
+
+        /// <summary>
         /// 一次目录枚举得到块内状态：存在且非空的帧数、块内最新写入时刻、首个缺失帧号。
         /// 只看 [from,to] 内的帧，避免别的任务/通道在写同一目录时干扰本块的无进展判定
         /// （旧实现 GetLatestWriteTimeUtc 扫的是整个目录）。
@@ -300,5 +366,43 @@ namespace RenderServerGui.Services
             for (int i = 0; i < _present.Length; i++) if (!_present[i]) return _from + i;
             return -1;
         }
+
     }
+
+    /// <summary>按帧列表索引存放的块扫描结果（索引 = frames 中的位置）。</summary>
+    public sealed class ByFrameBlockScan
+    {
+        private readonly bool[] _present;
+        private readonly int _fromIdx;
+        private readonly int _toIdx;
+        public DateTime LatestWriteUtc { get; private set; }
+        public void SetLatestWriteUtc(DateTime v) { LatestWriteUtc = v; }
+
+        public ByFrameBlockScan(List<int> frames, int fromIdx, int toIdx)
+        {
+            _fromIdx = fromIdx;
+            _toIdx = Math.Min(toIdx, frames.Count - 1);
+            _present = new bool[Math.Max(0, _toIdx - _fromIdx + 1)];
+        }
+
+        public void MarkPresent(int idx)
+        {
+            int i = idx - _fromIdx;
+            if (i >= 0 && i < _present.Length) _present[i] = true;
+        }
+
+        public int NonEmptyCount
+        {
+            get { int n = 0; foreach (bool b in _present) if (b) n++; return n; }
+        }
+
+        /// <summary>首个未落定的绝对索引；全部存在返回 -1。</summary>
+        public int FirstMissing()
+        {
+            for (int i = 0; i < _present.Length; i++)
+                if (!_present[i]) return _fromIdx + i;
+            return -1;
+        }
+    }
+
 }

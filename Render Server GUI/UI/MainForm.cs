@@ -49,6 +49,7 @@ namespace RenderServerGui.UI
             ApplyLanguage();
 
             _uiReady = true;
+            ApplyFrameMode();   // 初始化置灰状态：默认帧范围模式
         }
 
         // ---------- 初始化 ----------
@@ -100,6 +101,8 @@ namespace RenderServerGui.UI
 
             numFrStart.ValueChanged += (s, e) => UpdateRangeCount();
             numFrEnd.ValueChanged += (s, e) => UpdateRangeCount();
+            txtFrameSpec.TextChanged += (s, e) => UpdateRangeCount();
+            chkFrameSpec.CheckedChanged += (s, e) => ApplyFrameMode();
             cmbLang.SelectedIndexChanged += (s, e) => OnLanguageChanged();
             chkKeepAwake.CheckedChanged += (s, e) => OnKeepAwakeChanged();
 
@@ -108,6 +111,8 @@ namespace RenderServerGui.UI
             txtFrOutput.TextChanged += (s, e) => OnTaskEditChanged();
             numFrStart.ValueChanged += (s, e) => OnTaskEditChanged();
             numFrEnd.ValueChanged += (s, e) => OnTaskEditChanged();
+            txtFrameSpec.TextChanged += (s, e) => OnTaskEditChanged();
+            chkFrameSpec.CheckedChanged += (s, e) => OnTaskEditChanged();
             numMaxChunk.ValueChanged += (s, e) => OnTaskEditChanged();
             numFrTimeout.ValueChanged += (s, e) => OnTaskEditChanged();
 
@@ -121,12 +126,44 @@ namespace RenderServerGui.UI
             FormClosing += OnFormClosingHandler;
         }
 
-        /// <summary>刷新"帧范围"右侧的帧数量显示。</summary>
+        /// <summary>
+        /// 应用帧模式界面：帧串模式启用时，帧范围两个数值框置灰、帧串输入框可用；
+        /// 否则相反。后置灰的控件值仍保留，切回来时不丢（兼容旧数据）。
+        /// </summary>
+        private void ApplyFrameMode()
+        {
+            bool specMode = chkFrameSpec.Checked;
+            numFrStart.Enabled = !specMode;
+            numFrEnd.Enabled = !specMode;
+            txtFrameSpec.Enabled = specMode;
+            UpdateRangeCount();
+        }
+
+        /// <summary>
+        /// 刷新帧计数与帧串预览。帧范围模式下显示起止区间帧数；
+        /// 帧串模式下 lblRangeCount 显示帧串总帧数，lblSpecActual 显示实际渲染的帧。
+        /// </summary>
         private void UpdateRangeCount()
         {
-            long n = (long)numFrEnd.Value - (long)numFrStart.Value + 1;
-            if (n < 0) n = 0;
-            lblRangeCount.Text = Localizer.Tf("ui.count", "共 {0} 帧", n);
+            bool specMode = chkFrameSpec.Checked;
+            if (specMode)
+            {
+                var frames = RenderServerGui.Services.FrameSpec.Parse(
+                    txtFrameSpec.Text.Trim(), (int)numFrStart.Value, (int)numFrEnd.Value);
+                lblRangeCount.Text = Localizer.Tf("ui.count", "共 {0} 帧", frames.Count);
+                // 实际渲染哪些帧：用规范帧串（与输入框/任务存储一致，无乘号）
+                string preview = frames.Count == 0
+                    ? Localizer.T("ui.specEmpty", "(无有效帧)")
+                    : RenderServerGui.Services.FrameSpec.Format(frames);
+                lblSpecActual.Text = Localizer.Tf("ui.specActual", "实际渲染：{0}", preview);
+            }
+            else
+            {
+                long n = (long)numFrEnd.Value - (long)numFrStart.Value + 1;
+                if (n < 0) n = 0;
+                lblRangeCount.Text = Localizer.Tf("ui.count", "共 {0} 帧", n);
+                lblSpecActual.Text = string.Empty;
+            }
         }
 
         // ---------- 多语言 ----------
@@ -233,6 +270,8 @@ namespace RenderServerGui.UI
             lblFrScene.Text = Localizer.T("ui.scene", "工程文件");
             lblFrOutput.Text = Localizer.T("ui.output", "输出模板");
             lblFrStart.Text = Localizer.T("ui.range", "帧范围(起~止)");
+            chkFrameSpec.Text = Localizer.T("ui.useFrameSpec", "使用帧串");
+            lblFrameSpec.Text = Localizer.T("ui.frameSpec", "帧串");
             lblMaxChunk.Text = Localizer.T("ui.maxChunk", "最大分块长度");
             lblFrTimeout.Text = Localizer.T("ui.noProgressTimeout", "无进展超时(秒)");
             btnFrPreview.Text = Localizer.T("ui.preview", "预览输出文件名并校验目录");
@@ -466,6 +505,10 @@ namespace RenderServerGui.UI
             txtFrOutput.Text = t.OutputTemplate ?? string.Empty;
             numFrStart.Value = Clamp(t.StartFrame, numFrStart);
             numFrEnd.Value = Clamp(t.EndFrame, numFrEnd);
+            string spec = t.FrameSpec ?? string.Empty;
+            txtFrameSpec.Text = spec;
+            chkFrameSpec.Checked = spec.Trim().Length > 0;   // 旧数据 FrameSpec 为空 => 帧范围模式
+            ApplyFrameMode();
             numMaxChunk.Value = Clamp(t.MaxChunkLength, numMaxChunk);
             numFrTimeout.Value = Clamp(t.FrameTimeoutSeconds, numFrTimeout);
             _suppressTaskSelect = false;
@@ -484,6 +527,8 @@ namespace RenderServerGui.UI
             t.OutputTemplate = txtFrOutput.Text.Trim();
             t.StartFrame = (int)numFrStart.Value;
             t.EndFrame = (int)numFrEnd.Value;
+            // 仅帧串模式写入帧串；关闭时清空，回退到起止帧（兼容旧数据与两种模式切换）
+            t.FrameSpec = chkFrameSpec.Checked ? txtFrameSpec.Text.Trim() : string.Empty;
             t.MaxChunkLength = (int)numMaxChunk.Value;
             t.FrameTimeoutSeconds = (int)numFrTimeout.Value;
         }
@@ -706,7 +751,14 @@ namespace RenderServerGui.UI
                     var t = p.Tasks[i];
                     string prefix = Localizer.Tf("msg.taskN", "任务 {0}: ", i + 1);
                     if (string.IsNullOrWhiteSpace(t.SceneFile)) { error = prefix + Localizer.T("msg.badScene", "工程文件为空。"); return false; }
-                    if (t.StartFrame > t.EndFrame) { error = prefix + Localizer.T("msg.badRange", "起始帧不能大于结束帧。"); return false; }
+                    if (string.IsNullOrWhiteSpace(t.FrameSpec))
+                    {
+                        if (t.StartFrame > t.EndFrame) { error = prefix + Localizer.T("msg.badRange", "起始帧不能大于结束帧。"); return false; }
+                    }
+                    else if (t.GetFrames().Count == 0)
+                    {
+                        error = prefix + Localizer.T("msg.badFrameSpec", "帧串无有效帧号。"); return false;
+                    }
                     if (string.IsNullOrWhiteSpace(t.OutputTemplate)) { error = prefix + Localizer.T("msg.templateEmpty", "输出模板为空。"); return false; }
                     if (!HasFrameToken(t.OutputTemplate)) { error = prefix + Localizer.T("msg.templateNoToken", "输出模板缺少帧号占位符，应形如 Image_****.png。"); return false; }
                 }
@@ -994,6 +1046,10 @@ namespace RenderServerGui.UI
                     // 先设结束再设起始，避免中间状态出现「起 > 止」
                     numFrEnd.Value = Clamp(info.EndFrame, numFrEnd);
                     numFrStart.Value = Clamp(info.StartFrame, numFrStart);
+                    string spec = info.FrameSpec ?? string.Empty;
+                    txtFrameSpec.Text = spec;
+                    chkFrameSpec.Checked = spec.Trim().Length > 0;   // 读到不连续帧/步进时切到帧串模式
+                    ApplyFrameMode();
                     changed = true;
                 }
 
@@ -1002,9 +1058,11 @@ namespace RenderServerGui.UI
                     string output = string.IsNullOrEmpty(info.OutputTemplate)
                         ? Localizer.T("log.sceneAutoNoOutput", "(工程内未设置输出路径)")
                         : info.OutputTemplate;
-                    string frames = info.FrameRangeKnown
-                        ? string.Format("{0}-{1}", info.StartFrame, info.EndFrame)
-                        : Localizer.T("log.sceneAutoDynamic", "由 C4D 动态解析，保留手填范围");
+                    string frames = !string.IsNullOrWhiteSpace(info.FrameSpec)
+                        ? info.FrameSpec
+                        : (info.FrameRangeKnown
+                            ? string.Format("{0}-{1}", info.StartFrame, info.EndFrame)
+                            : Localizer.T("log.sceneAutoDynamic", "由 C4D 动态解析，保留手填范围"));
                     AppendLog(new LogEntry(LogLevel.Info,
                         Localizer.Tf("log.sceneAuto", "已读取工程渲染设置（第 {0} 组）：输出 {1}，帧 {2}",
                                       info.BlockIndex + 1, output, frames)));

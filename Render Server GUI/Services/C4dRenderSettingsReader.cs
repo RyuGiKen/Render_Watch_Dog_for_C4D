@@ -53,6 +53,8 @@ namespace RenderServerGui.Services
         public bool FromDocumentTimeline { get; set; }
         /// <summary>是否从文件二进制的活动标志（块前 0F 10 00 00）判定为活动组。</summary>
         public bool IsActiveFromFlag { get; set; }
+        /// <summary>完整帧列表的帧串表达式（不连续时保留全部，如 1-3,10）；为空表示只有单一连续区间。</summary>
+        public string FrameSpec { get; set; }
     }
 
     /// <summary>
@@ -230,7 +232,8 @@ namespace RenderServerGui.Services
                     NoteKey = null,
                     NoteArgs = null,
                     Note = string.Empty,
-                    IsActiveFromFlag = b.IsActive
+                    IsActiveFromFlag = b.IsActive,
+                    FrameSpec = string.Empty
                 };
 
                 ResolveFrameRange(info, map, seq, docFps, step, rangeStr, timeline);
@@ -267,12 +270,13 @@ namespace RenderServerGui.Services
                 info.FrameRangeKnown = true;
                 if (step > 1)
                 {
-                    // 帧号集合 a, a+step, ... 不连续；GUI 只能表达连续区间 -> 取第一段（单帧）
-                    info.EndFrame = a;
-                    info.Truncated = true;
+                    // 帧号集合 a, a+step, ... 不连续；保留完整等差帧列表，交给调度器按段渲染。
+                    var frames = new List<int>();
+                    for (int f = a; f <= b; f += step) frames.Add(f);
+                    info.FrameSpec = RenderServerGui.Services.FrameSpec.Format(frames);
                     info.NoteKey = "log.sceneNoteManualStep";
-                    info.NoteArgs = new object[] { step, a };
-                    info.Note = string.Format("手动步进={0}，帧号不连续，仅采用首帧 {1}", step, a);
+                    info.NoteArgs = new object[] { step, info.FrameSpec };
+                    info.Note = string.Format("手动步进={0}，帧列表 {1}（将按连续段渲染）", step, info.FrameSpec);
                 }
                 return;
             }
@@ -282,22 +286,15 @@ namespace RenderServerGui.Services
                 var frames = ExpandRangeString(rangeStr);
                 if (frames.Count > 0)
                 {
-                    int a = frames[0], b = frames[0];
-                    for (int i = 1; i < frames.Count; i++)
-                    {
-                        if (frames[i] == b + 1) b = frames[i];
-                        else break;                       // 遇到跳号即停：只取第一段连续帧
-                    }
-                    info.StartFrame = a;
-                    info.EndFrame = b;
+                    // 完整保留不连续帧列表：FrameSpec 交给任务，调度器拆段渲染。
+                    info.FrameSpec = RenderServerGui.Services.FrameSpec.Format(frames);
+                    info.StartFrame = frames[0];
+                    info.EndFrame = frames[frames.Count - 1];
                     info.FrameRangeKnown = true;
-                    info.Truncated = b < frames[frames.Count - 1];
-                    if (info.Truncated)
-                    {
-                        info.NoteKey = "log.sceneNoteTruncated";
-                        info.NoteArgs = new object[] { rangeStr, a, b };
-                        info.Note = string.Format("自定义帧串 {0} 不连续，仅采用第一段 {1}-{2}", rangeStr, a, b);
-                    }
+                    info.Truncated = false;
+                    info.NoteKey = "log.sceneNoteCustomFrames";
+                    info.NoteArgs = new object[] { info.FrameSpec };
+                    info.Note = string.Format("自定义帧串 {0}（含不连续帧，将按连续段渲染）", info.FrameSpec);
                     return;
                 }
             }

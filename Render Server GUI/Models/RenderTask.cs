@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using RenderServerGui.Services;
 
@@ -26,8 +27,14 @@ namespace RenderServerGui.Models
         /// <summary>起始帧。</summary>
         public int StartFrame { get; set; }
 
-        /// <summary>结束帧。</summary>
+        /// <summary>结束帧（兼容字段：FrameSpec 为空时作为连续区间的终点）。</summary>
         public int EndFrame { get; set; }
+
+        /// <summary>
+        /// 帧串表达式（如 1-3,10,20-22:5）。为空时按 StartFrame..EndFrame 逐帧处理，
+        /// 兼容旧配置与仅用起止框的界面。用 FrameSpec.Parse 解析。
+        /// </summary>
+        public string FrameSpec { get; set; }
 
         /// <summary>最大分块长度：一个进程一次连渲的帧数上限。1=单帧；执行时自动夹到任务范围。</summary>
         public int MaxChunkLength { get; set; }
@@ -48,7 +55,10 @@ namespace RenderServerGui.Models
                 string name = string.IsNullOrWhiteSpace(SceneFile)
                     ? Localizer.T("ui.taskNoScene", "(未设置工程)")
                     : Path.GetFileNameWithoutExtension(SceneFile);
-                return $"{Localizer.T("ui.taskWord", "任务")}{TaskId:D3}  {name} [{StartFrame}-{EndFrame}]";
+                string frames = string.IsNullOrWhiteSpace(FrameSpec)
+                    ? string.Format("{0}-{1}", StartFrame, EndFrame)
+                    : FrameSpec;
+                return $"{Localizer.T("ui.taskWord", "任务")}{TaskId:D3}  {name} [{frames}]";
             }
         }
 
@@ -62,9 +72,22 @@ namespace RenderServerGui.Models
                 OutputTemplate = @"D:\Output\Image_****.png",
                 StartFrame = 0,
                 EndFrame = 100,
+                FrameSpec = string.Empty,
                 MaxChunkLength = 1,
                 FrameTimeoutSeconds = 600
             };
+        }
+
+        /// <summary>解析任务的帧列表（FrameSpec 为空时回退到 StartFrame..EndFrame）。</summary>
+        public List<int> GetFrames()
+        {
+            return RenderServerGui.Services.FrameSpec.Parse(FrameSpec, StartFrame, EndFrame);
+        }
+
+        /// <summary>把帧列表拆成可直接交给 C4D 的连续段。</summary>
+        public List<RenderServerGui.Services.FrameSegment> GetSegments()
+        {
+            return RenderServerGui.Services.FrameSpec.SplitSegments(GetFrames());
         }
 
         /// <summary>浅拷贝渲染参数（不含主键 TaskId，添加时统一分配新号）。</summary>
@@ -76,6 +99,7 @@ namespace RenderServerGui.Models
                 OutputTemplate = this.OutputTemplate,
                 StartFrame = this.StartFrame,
                 EndFrame = this.EndFrame,
+                FrameSpec = this.FrameSpec,
                 MaxChunkLength = this.MaxChunkLength,
                 FrameTimeoutSeconds = this.FrameTimeoutSeconds
             };

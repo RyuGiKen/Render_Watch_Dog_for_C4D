@@ -57,6 +57,7 @@
     <Compile Include="Services\IRenderController.cs" />
     <Compile Include="Services\ProcessHealth.cs" />
     <Compile Include="Services\FrameScanner.cs" />
+    <Compile Include="Services\FrameSpec.cs" />
     <Compile Include="Services\FrameStateMap.cs" />
     <Compile Include="Services\Localizer.cs" />
     <Compile Include="Services\C4dPathLocator.cs" />
