@@ -525,8 +525,17 @@ namespace RenderServerGui.Services
             {
                 Length = new FileInfo(path).Length;
                 ScanStart = Math.Max(0, Length - 32L * 1024 * 1024);   // 尾部 32MB 优先
-                _mmf = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
-                _acc = _mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+                var mmf = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+                try
+                {
+                    _acc = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+                    _mmf = mmf;                 // 只在两步都成功后才持有，异常时 mmf 由 catch 释放
+                }
+                catch
+                {
+                    mmf.Dispose();              // 构造失败也要释放映射，避免占用文件句柄
+                    throw;
+                }
             }
 
             public byte Byte(long o) { return _acc.ReadByte(o); }
